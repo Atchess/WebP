@@ -4,12 +4,14 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 
+#define BLOCKSIZE 16
+
 using namespace cv;
 
 class WebP {
 private:
-    Mat *Y, *U, *V;
-    Mat *img_origin;
+    Mat Y, U, V;
+    Mat img_origin;
     void imagePretreatment(String path);
 
 public:
@@ -17,8 +19,6 @@ public:
     WebP(String path);
     ~WebP();
 }; 
-WebP::WebP(){} 
-WebP::~WebP(){}
 
 
 #endif
