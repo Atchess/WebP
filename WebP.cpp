@@ -3,8 +3,6 @@
 WebP::WebP(String path) {
     imagePretreatment(path);
     subSampling();
-    imshow("origin", img_origin);
-    imshow("16", img_16base);
 }
 
 WebP::~WebP() {
@@ -92,40 +90,32 @@ Mat WebP::zigzag(Mat input) {
 
 void WebP::imagePretreatment(String path) {
     img_origin = imread(path);
-    Mat img_YUV, img_temp1, img_temp2;
+    Mat img_YUV, img_temp0, img_temp1, img_temp2;
     int cols, rows;
     cvtColor(img_origin, img_YUV, COLOR_RGB2YUV);
     cols = img_origin.cols % MACROBLOCKSIZE == 0 ? img_origin.cols : (img_origin.cols / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
     rows = img_origin.rows % MACROBLOCKSIZE == 0 ? img_origin.rows : (img_origin.rows / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
-    img_16base.create(rows, cols, CV_16SC3);
-    img_temp1 = img_origin;
-    img_temp2 = img_16base(Range(0, img_origin.rows), Range(0, img_origin.cols));
+    img_16base.create(rows, cols, img_YUV.type());
+    img_temp1 = img_YUV(Rect(0, 0, img_YUV.cols, img_YUV.rows));
+    img_temp2 = img_16base(Range(0, img_YUV.rows), Range(0, img_YUV.cols));
     img_temp1.copyTo(img_temp2);
-    imshow("test", img_temp2);
-    imshow("te", img_YUV);
+    // Mat test = Mat::zeros(img_16base.cols / 2, img_16base.rows / 2, img_YUV.type());
+    // resize(img_16base, test, Size(img_16base.cols / 2, img_16base.rows / 2));
+    // imshow("test1", test);
     if (img_YUV.cols % MACROBLOCKSIZE != 0) {
         int patch = MACROBLOCKSIZE - img_YUV.cols % MACROBLOCKSIZE;
-        /*
-        for (int i = 0; i < img_16base.rows; i++) {
-            for (int j = 0; j < patch; j++) {
-                img_16base.at<Vec3s>(i, img_origin.cols + j)[0] = img_origin.at<Vec3s>(i, img_origin.cols - 1)[0];
-                img_16base.at<Vec3s>(i, img_origin.cols + j)[1] = img_origin.at<Vec3s>(i, img_origin.cols - 1)[1];
-                img_16base.at<Vec3s>(i, img_origin.cols + j)[2] = img_origin.at<Vec3s>(i, img_origin.cols - 1)[2];
-            }
-        }
-        */
-        img_temp1 = img_origin(Range(0, img_origin.rows), Range(img_origin.cols - 1, img_origin.cols));
+        img_temp1 = img_YUV(Range(0, img_YUV.rows), Range(img_YUV.cols - 1, img_YUV.cols));
         for (int i = 0; i < patch; i++) {
-            img_temp2 = img_16base(Range(0, img_origin.rows), Range(img_origin.cols + i, img_origin.cols + i + 1));
+            img_temp2 = img_16base(Range(0, img_YUV.rows), Range(img_YUV.cols + i, img_YUV.cols + i + 1));
             img_temp1.copyTo(img_temp2);
         }
        
     }
     if (img_YUV.rows % MACROBLOCKSIZE != 0) {
         int patch = MACROBLOCKSIZE - img_YUV.rows % MACROBLOCKSIZE;
-        img_temp1 = img_16base(Range(img_origin.rows - 1, img_origin.rows), Range(0, img_16base.cols));
+        img_temp1 = img_16base(Range(img_YUV.rows - 1, img_YUV.rows), Range(0, img_16base.cols));
         for (int i = 0; i < patch; i++) {
-            img_temp2 = img_16base(Range(img_origin.rows + i, img_origin.rows + i + 1), Range(0, img_16base.cols));
+            img_temp2 = img_16base(Range(img_YUV.rows + i, img_YUV.rows + i + 1), Range(0, img_16base.cols));
             img_temp1.copyTo(img_temp2);
         }
     }
@@ -141,14 +131,21 @@ void WebP::subSampling() {
     V.create(img_16base.rows / 2, img_16base.cols / 2, CV_16S);
     for (int i = 0; i < img_16base.rows / 2; i++) {
         for (int j = 0; j < img_16base.cols / 2; j++) {
-            U.at<short>(i, j) = (img_16base.at<Vec3s>(i * 2, j * 2)[1] + img_16base.at<Vec3s>(i * 2 + 1, j * 2)[1] + img_16base.at<Vec3s>(i * 2, j * 2 + 1)[1] + img_16base.at<Vec3s>(i * 2 + 1, j * 2 + 1)[1]) / 4;
-            V.at<short>(i, j) = (img_16base.at<Vec3s>(i * 2, j * 2)[2] + img_16base.at<Vec3s>(i * 2 + 1, j * 2)[2] + img_16base.at<Vec3s>(i * 2, j * 2 + 1)[2] + img_16base.at<Vec3s>(i * 2 + 1, j * 2 + 1)[2]) / 4;
-            Y.at<short>(i * 2, j * 2) = img_16base.at<Vec3s>(i * 2, j * 2)[0];
-            Y.at<short>(i * 2 + 1, j * 2) = img_16base.at<Vec3s>(i * 2 + 1, j * 2)[0];
-            Y.at<short>(i * 2, j * 2 + 1) = img_16base.at<Vec3s>(i * 2, j * 2 + 1)[0];
-            Y.at<short>(i * 2 + 1, j * 2 + 1) = img_16base.at<Vec3s>(i * 2 + 1, j * 2 + 1)[0];
+            U.at<short>(i, j) = (img_16base.at<Vec3b>(i * 2, j * 2)[1] + img_16base.at<Vec3b>(i * 2 + 1, j * 2)[1] + img_16base.at<Vec3b>(i * 2, j * 2 + 1)[1] + img_16base.at<Vec3b>(i * 2 + 1, j * 2 + 1)[1]) / 4;
+            V.at<short>(i, j) = (img_16base.at<Vec3b>(i * 2, j * 2)[2] + img_16base.at<Vec3b>(i * 2 + 1, j * 2)[2] + img_16base.at<Vec3b>(i * 2, j * 2 + 1)[2] + img_16base.at<Vec3b>(i * 2 + 1, j * 2 + 1)[2]) / 4;
+            Y.at<short>(i * 2, j * 2) = img_16base.at<Vec3b>(i * 2, j * 2)[0];
+            Y.at<short>(i * 2 + 1, j * 2) = img_16base.at<Vec3b>(i * 2 + 1, j * 2)[0];
+            Y.at<short>(i * 2, j * 2 + 1) = img_16base.at<Vec3b>(i * 2, j * 2 + 1)[0];
+            Y.at<short>(i * 2 + 1, j * 2 + 1) = img_16base.at<Vec3b>(i * 2 + 1, j * 2 + 1)[0];
         }
     }
+    // Mat test;
+    // Y.convertTo(test, CV_8U);
+    // imshow("Y", test);
+    // U.convertTo(test, CV_8U);
+    // imshow("U", test);
+    // V.convertTo(test, CV_8U);
+    // imshow("V", test);
 }
 
 Mat WebP::predictiveCoding(int block_num, int channel) {

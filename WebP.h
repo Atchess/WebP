@@ -14,8 +14,6 @@ using namespace std;
 #define TM_PRED 3
 
 #define MACROBLOCKSIZE 16
-typedef Vec<int, 3> Vec3i;
-typedef Vec<short, 3> Vec3s;
 
 class WebP {
 private:
