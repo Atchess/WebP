@@ -10,13 +10,37 @@ WebP::~WebP() {
 }
 
 void WebP::compress() {
+    dct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
+    dct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
+    dct_V.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
+    Mat dct_block_Y, dct_block_U, dct_block_V, mat_temp;
+    Mat zig_block_Y, zig_block_U, zig_block_V;
+    int block_num;
     for (int i = 0; i < block_rows; i ++) {
         for (int j = 0; j < block_cols; j ++) {
+            block_num = i * block_cols + j;
             
+            dct_block_Y = dct(block_num, Y_CHANNEL);
+            zig_block_Y = zigzag(dct_block_Y);
+            mat_temp = dct_Y(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE * MACROBLOCKSIZE));
+            zig_block_Y.copyTo(mat_temp);
+            
+            dct_block_U = dct(block_num, U_CHANNEL);
+            zig_block_U = zigzag(dct_block_U);
+            mat_temp = dct_U(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2));
+            zig_block_U.copyTo(mat_temp);
+            
+            dct_block_V = dct(block_num, V_CHANNEL);
+            zig_block_V = zigzag(dct_block_V);
+            mat_temp = dct_V(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2));
+            zig_block_V.copyTo(mat_temp);
         }
     }
+
 }
 
+// the function is so bad, but i don't want to rewrite it. 
+// maybe when i finish the project, i will consider rewriting it.
 Mat WebP::zigzag(Mat input) {
     Mat zigMat = Mat::zeros(input.cols * input.rows, 0, CV_16S);
     zigMat.at<short>(0,0) = input.at<short>(0,0);
@@ -149,24 +173,129 @@ void WebP::subSampling() {
 }
 
 Mat WebP::predictiveCoding(int block_num, int channel) {
-    Mat temp0, temp1, temp2, temp3, predict_mat;
-    temp0 = hPredict(block_num, channel);
-    predict_mat = temp0;
-    return predict_mat;
-}
-
-Mat WebP::hPredict(int block_num, int channel) {
-    int block_size = MACROBLOCKSIZE; 
+    Mat temp_mat[4], predict_mat;
+    int distance = INF, block_size = MACROBLOCKSIZE, index = 0; 
     Mat * channel_mat;
     switch (channel) {
-    case 0:
+        case Y_CHANNEL:
+            channel_mat = &Y;
+            break;
+        case U_CHANNEL:
+            channel_mat = &U;
+            block_size /= 2; 
+            break;
+        case V_CHANNEL:
+            channel_mat = &V;
+            block_size /= 2; 
+            break;
+        default:
+            cout<<"[ERROR]: wrong channel!"<<endl;
+            exit(-1);
+            break;
+    }
+    temp_mat[0] = hPredict(block_num, channel, *channel_mat);
+    temp_mat[1] = vPredict(block_num, channel, *channel_mat);
+    temp_mat[2] = dcPredict(block_num, channel, *channel_mat);     
+    temp_mat[3] = tmPredict(block_num, channel, *channel_mat); 
+
+    for (int i = 0; i < 4; i++) {
+        int temp = residualLength(temp_mat[i]);
+        if (temp < distance) {
+            distance = temp;
+            index = i;
+        }
+    }
+    // add forecast method type to vector 
+    predict_type.push_back(index);
+    return temp_mat[index];
+}
+
+Mat WebP::hPredict(int block_num, int block_size, Mat channel_mat) {
+    Mat residual_mat, predict_mat, origin_mat;
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    predict_mat.zeros(block_size, block_size, CV_16S);
+    origin_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
+    if (block_col != 0) {
+        Mat temp = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size + block_size - 1));
+        temp.copyTo(predict_mat);
+    } else {
+        Mat temp0 = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size - 1));
+        Mat temp1 = predict_mat(Range(0, block_size), Range(1, block_size));
+        temp0.copyTo(temp1);
+    }
+    absdiff(origin_mat, predict_mat, residual_mat);
+    return residual_mat;
+}
+
+
+Mat WebP::vPredict(int block_num, int block_size, Mat channel_mat) {
+    Mat residual_mat, predict_mat, origin_mat;
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    predict_mat.zeros(block_size, block_size, CV_16S);
+    origin_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
+    if (block_row != 0) {
+        Mat temp = channel_mat(Range(block_row * block_size - 1, block_row * block_size + block_size - 1), Range(block_col * block_size, block_col * block_size + block_size));
+        temp.copyTo(predict_mat);
+    } else {
+        Mat temp0 = channel_mat(Range(block_row * block_size, block_row * block_size + block_size - 1), Range(block_col * block_size, block_col * block_size + block_size));
+        Mat temp1 = predict_mat(Range(1, block_size), Range(0, block_size));
+        temp0.copyTo(temp1);
+    }
+    absdiff(origin_mat, predict_mat, residual_mat);
+    return residual_mat;
+}
+
+Mat WebP::dcPredict(int block_num, int block_size, Mat channel_mat) {
+    Mat residual_mat, predict_mat, origin_mat;
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    predict_mat.zeros(block_size, block_size, CV_16S);
+    origin_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
+    if (block_col != 0) {
+        Mat temp = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size + block_size - 1));
+        temp.copyTo(predict_mat);
+    } else {
+        Mat temp0 = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size - 1));
+        Mat temp1 = predict_mat(Range(0, block_size), Range(1, block_size));
+        temp0.copyTo(temp1);
+    }
+    absdiff(origin_mat, predict_mat, residual_mat);
+    return residual_mat;
+}
+
+Mat WebP::tmPredict(int block_num, int block_size, Mat channel_mat) {
+    Mat residual_mat, predict_mat, origin_mat;
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    predict_mat.zeros(block_size, block_size, CV_16S);
+    origin_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
+    if (block_col != 0) {
+        Mat temp = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size + block_size - 1));
+        temp.copyTo(predict_mat);
+    } else {
+        Mat temp0 = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size - 1));
+        Mat temp1 = predict_mat(Range(0, block_size), Range(1, block_size));
+        temp0.copyTo(temp1);
+    }
+    absdiff(origin_mat, predict_mat, residual_mat);
+    return residual_mat;
+}
+
+Mat WebP::dct(int block_num, int channel) {
+    int block_size = MACROBLOCKSIZE; 
+    Mat * channel_mat;
+    Mat residual_mat, result_mat;
+    switch (channel) {
+    case Y_CHANNEL:
         channel_mat = &Y;
         break;
-    case 1:
+    case U_CHANNEL:
         channel_mat = &U;
         block_size /= 2; 
         break;
-    case 2:
+    case V_CHANNEL:
         channel_mat = &V;
         block_size /= 2; 
         break;
@@ -175,17 +304,23 @@ Mat WebP::hPredict(int block_num, int channel) {
         exit(-1);
         break;
     }
-    Mat predict_mat;
     int block_row = block_num / block_cols;
     int block_col = block_num % block_cols;
-    predict_mat.zeros(block_size, block_size, CV_16S);
-    if (block_col != 0) {
-        Mat temp = (*channel_mat)(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size + block_size - 1));
-        temp.copyTo(predict_mat);
-    } else {
-        Mat temp0 = (*channel_mat)(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size - 1));
-        Mat temp1 = predict_mat(Range(0, block_size), Range(1, block_size));
-        temp0.copyTo(temp1);
-    }
-    return predict_mat;
+    //temp_mat = (*channel_mat)(Range(block_row * block_size, (block_row + 1) * block_size), Range(block_col * block_size, (block_col + 1) * block_size));
+    residual_mat = predictiveCoding(block_num, channel);
+    cv::dct(residual_mat, result_mat);
+
+    return result_mat;
+}
+
+// using E1 distance
+int WebP::EuclideanDistance(Mat mat1, Mat mat2) {
+
+}
+
+int WebP::residualLength(Mat mat) {
+    double minValue, maxValue;
+    Point minLoc, maxLoc;
+    minMaxLoc(mat, &minValue, &maxValue, &minLoc, &maxLoc);
+    return (int)(abs(minValue) > maxValue ? abs(minValue) : abs(maxValue));
 }

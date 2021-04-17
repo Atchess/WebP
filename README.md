@@ -47,3 +47,25 @@ Mat: CV_64FC1，CV_64FC2，CV_64FC3，CV_64FC4
 
 ### Unsigned 1bit bool
 IplImage: IPL_DEPTH_1U
+
+
+|大小|
+|--2bit--|
+|编码表|
+|****|
+
+dct
+
+预测编码
+dct
+量化
+
+dcmp
+游程编码
+
+算术编码
+
+解压
+
+算术
+
