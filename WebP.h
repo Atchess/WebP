@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <vector>
+#include <math.h>
 
 using namespace cv;
 using namespace std;
@@ -23,13 +24,17 @@ using namespace std;
 class WebP {
 private:
     Mat Y, U, V;
-    Mat img_origin;
-    Mat img_16base;
-    Mat dct_Y;
-    Mat dct_U;
-    Mat dct_V;
-    unsigned int block_rows, block_cols;
+    Mat img_origin, img_16base;
+    Mat dct_Y, dct_U, dct_V;
+
+    Mat img_reconstruct, img_reconstruct_16base;
+    Mat idct_Y, idct_U, idct_V;
+    Mat Y_reconstruct, U_reconstruct, V_reconstruct; 
+    unsigned int block_rows, block_cols, height, width;
     vector<unsigned int> predict_type;
+    vector<unsigned int> reconstruct_type;
+
+    String path;
 
     // compress
     void imagePretreatment(String path);
@@ -45,9 +50,13 @@ private:
     int EuclideanDistance(Mat mat1, Mat mat2);
     int residualLength(Mat mat);
     // decompress
-    Mat unzigzag(Mat input);
-    Mat undct(int block_num, int channel);
-    Mat unpredictCoding(int block_num, int channel);
+    Mat inzigzag(Mat input);
+    Mat indct(int block_num, int channel);
+    Mat inpredictCoding(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
+    Mat inhPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
+    Mat invPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
+    Mat indcPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
+    Mat intmPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
     Mat reconstructImage();
     void uncompress();
 

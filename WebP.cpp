@@ -1,9 +1,16 @@
 #include "WebP.h"
 
 WebP::WebP(String path) {
-    imagePretreatment(path);
-    subSampling();
+    this->path = path;
     compress();
+    
+    idct_Y = dct_Y.clone();
+    idct_U = dct_U.clone();
+    idct_V = dct_V.clone();
+    reconstruct_type.assign(predict_type.begin(), predict_type.end());
+    uncompress();
+    imshow("test", img_reconstruct);
+    waitKey();
 }
 
 WebP::~WebP() {
@@ -11,6 +18,8 @@ WebP::~WebP() {
 }
 
 void WebP::compress() {
+    imagePretreatment(path);
+    subSampling();
     dct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
     dct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
     dct_V.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
@@ -20,11 +29,10 @@ void WebP::compress() {
     for (int i = 0; i < block_rows; i ++) {
         for (int j = 0; j < block_cols; j ++) {
             block_num = i * block_cols + j;
-            
             dct_block_Y = dct(block_num, Y_CHANNEL);
             zig_block_Y = zigzag(dct_block_Y);
             mat_temp = dct_Y(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE * MACROBLOCKSIZE));
-            zig_block_Y.copyTo(mat_temp);
+            zig_block_Y.copyTo(mat_temp);    
             
             dct_block_U = dct(block_num, U_CHANNEL);
             zig_block_U = zigzag(dct_block_U);
@@ -43,26 +51,26 @@ void WebP::compress() {
 // the function is so bad, but i don't want to rewrite it. 
 // maybe when i finish the project, i will consider rewriting it.
 Mat WebP::zigzag(Mat input) {
-    Mat zigMat = Mat::zeros(input.cols * input.rows, 1, CV_16S);
-    zigMat.at<short>(0,0) = input.at<short>(0,0);
+    Mat zigMat = Mat::zeros(1, input.cols * input.rows, CV_16S);
+    zigMat.at<short>(0,0) = input.at<float>(0,0);
     int i = 0, j = 1, k = 1;
     int flag = 1, direction = 0;
     while (1) {
         if (i == input.rows - 1 && j == input.cols - 1) {
-            zigMat.at<short>(0, k) = input.at<short>(input.rows - 1, input.cols - 1);
+            zigMat.at<short>(0, k) = input.at<float>(input.rows - 1, input.cols - 1);
             break;
         }
         if (i == 0) {
             if (flag == 0) {
                 if (j != input.cols - 1) {
                     flag = 1;
-                    zigMat.at<short>(0, k ++) = input.at<short>(i, j ++);
+                    zigMat.at<short>(0, k ++) = input.at<float>(i, j ++);
                     continue;
                 }
             } else {
                 flag = 0;
                 direction = 0;
-                zigMat.at<short>(0, k ++) = input.at<short>(i ++, j --);
+                zigMat.at<short>(0, k ++) = input.at<float>(i ++, j --);
                 continue;
             }
         }
@@ -70,44 +78,44 @@ Mat WebP::zigzag(Mat input) {
             if (flag == 0) {
                 if (i != input.rows - 1) {
                     flag = 1;
-                    zigMat.at<short>(0, k ++) = input.at<short>(i ++, j);
+                    zigMat.at<short>(0, k ++) = input.at<float>(i ++, j);
                     continue;
                 }
             } else {
                 flag = 0;
                 direction = 1;
-                zigMat.at<short>(0, k ++) = input.at<short>(i --, j ++);
+                zigMat.at<short>(0, k ++) = input.at<float>(i --, j ++);
                 continue;
             }
         }
         if (i == input.rows - 1) {
             if (flag == 0) {
                 flag = 1;
-                zigMat.at<short>(0, k ++) = input.at<short>(i, j ++);
+                zigMat.at<short>(0, k ++) = input.at<float>(i, j ++);
                 continue;
             } else {
                 flag = 0;
                 direction = 1;
-                zigMat.at<short>(0, k ++) = input.at<short>(i --, j ++);
+                zigMat.at<short>(0, k ++) = input.at<float>(i --, j ++);
                 continue;
             }
         }
         if (j == input.cols - 1) {
             if (flag == 0) {
                 flag = 1;
-                zigMat.at<short>(0, k ++) = input.at<short>(i ++, j);
+                zigMat.at<short>(0, k ++) = input.at<float>(i ++, j);
                 continue;
             } else {
                 flag = 0;
                 direction = 0;
-                zigMat.at<short>(0, k ++) = input.at<short>(i ++, j --);
+                zigMat.at<short>(0, k ++) = input.at<float>(i ++, j --);
                 continue;
             }
         }
         if (direction) {
-            zigMat.at<short>(0, k ++) = input.at<short>(i --, j ++);
+            zigMat.at<short>(0, k ++) = input.at<float>(i --, j ++);
         } else {
-            zigMat.at<short>(0, k ++) = input.at<short>(i ++, j --);
+            zigMat.at<short>(0, k ++) = input.at<float>(i ++, j --);
         }
     }
     return zigMat;
@@ -120,6 +128,8 @@ void WebP::imagePretreatment(String path) {
     cvtColor(img_origin, img_YUV, COLOR_RGB2YUV);
     cols = img_origin.cols % MACROBLOCKSIZE == 0 ? img_origin.cols : (img_origin.cols / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
     rows = img_origin.rows % MACROBLOCKSIZE == 0 ? img_origin.rows : (img_origin.rows / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
+    height = img_origin.rows;
+    width = img_origin.cols;
     img_16base.create(rows, cols, img_YUV.type());
     img_temp1 = img_YUV(Rect(0, 0, img_YUV.cols, img_YUV.rows));
     img_temp2 = img_16base(Range(0, img_YUV.rows), Range(0, img_YUV.cols));
@@ -194,11 +204,12 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
             exit(-1);
             break;
     }
+
     temp_mat[0] = hPredict(block_num, block_size, channel_mat);
     temp_mat[1] = vPredict(block_num, block_size, channel_mat);
     temp_mat[2] = dcPredict(block_num, block_size, channel_mat);     
     temp_mat[3] = tmPredict(block_num, block_size, channel_mat); 
-
+    
     for (int i = 0; i < 4; i++) {
         int temp = residualLength(temp_mat[i]);
         if (temp < distance) {
@@ -263,15 +274,13 @@ Mat WebP::dcPredict(int block_num, int block_size, Mat channel_mat) {
         Mat temp = channel_mat(Range(block_row * block_size - 1, block_row * block_size), Range(block_col * block_size , block_col * block_size + block_size));
         mean0 = mean(temp).val[0];
     } else {
-        Mat temp = channel_mat(Range(0, 1), Range(block_col * block_size, block_col * block_size + block_size));
-        mean0 = mean(temp).val[0];
+        mean0 = 0;
     }
     if (block_col != 0) {
         Mat temp = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size));
         mean1 = mean(temp).val[0];
     } else {
-        Mat temp = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(0, 1));
-        mean1 = mean(temp).val[0];
+        mean1 = 0;
     }
 
     predict_mat = predict_mat * ((mean0 + mean1) / 2);
@@ -281,36 +290,43 @@ Mat WebP::dcPredict(int block_num, int block_size, Mat channel_mat) {
 }
 
 Mat WebP::tmPredict(int block_num, int block_size, Mat channel_mat) {
-    Mat residual_mat, predict_mat, origin_mat, first_col_mat, trueMotion_mat;
+    Mat residual_mat, predict_mat, origin_mat, left_col_mat, up_row_mat;
+    Mat temp_mat0, temp_mat1, temp_mat2; 
     int block_row = block_num / block_cols;
     int block_col = block_num % block_cols;
-    predict_mat = Mat::zeros(block_size, block_size, CV_16S);
+    int leftup = 0;
     origin_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
-    first_col_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + 1)).clone();
-    if (block_col != 0) {
-        Mat temp = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size));
-        subtract(first_col_mat, temp, trueMotion_mat);
+    if (block_row != 0) {
+        up_row_mat = channel_mat(Range(block_row * block_size - 1, block_row * block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
     } else {
-        trueMotion_mat = first_col_mat.clone();
+        up_row_mat = Mat::zeros(1, block_size, CV_16S);
     }
+    if (block_col != 0) {
+        left_col_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size)).clone();
+    } else {
+        left_col_mat = Mat::zeros(block_size, 1, CV_16S);
+    }
+    if (block_row != 0 && block_col != 0) {
+        leftup = channel_mat.at<short>(block_row * block_size - 1, block_col * block_size - 1);
+    }
+
+    temp_mat0 = Mat::ones(block_size, block_size, CV_16S);
+    temp_mat1 = Mat::ones(block_size, block_size, CV_16S);
+    temp_mat2 = Mat::ones(block_size, block_size, CV_16S) * leftup;
     for (int i = 0; i < block_size; i++) {
-        Mat temp_mat0 = predict_mat(Range(0, block_size), Range(i, i + 1));
-        Mat temp_mat1 = (first_col_mat + i * trueMotion_mat);
-        temp_mat1.copyTo(temp_mat0);
+        left_col_mat.copyTo(temp_mat0(Range(0, block_size), Range(i, i + 1)));
+        up_row_mat.copyTo(temp_mat1(Range(i, i + 1), Range(0, block_size)));
     }
+    predict_mat = temp_mat0 + temp_mat1 - temp_mat2;
     subtract(origin_mat, predict_mat, residual_mat);
     return residual_mat;
 }
 
 Mat WebP::dct(int block_num, int channel) {
-    int block_size = MACROBLOCKSIZE; 
     Mat residual_mat, result_mat;
-    int block_row = block_num / block_cols;
-    int block_col = block_num % block_cols;
     residual_mat = predictiveCoding(block_num, channel);
-    Mat test;
-    residual_mat.convertTo(test, CV_32F);
-    cv::dct(test, result_mat);
+    residual_mat.convertTo(residual_mat, CV_32F);
+    cv::dct(residual_mat, result_mat);
     //cout<<residual_mat<<endl;
     //cout<<result_mat<<endl;
     return result_mat;
@@ -320,4 +336,283 @@ int WebP::residualLength(Mat mat) {
     Point minLoc, maxLoc;
     minMaxLoc(mat, &minValue, &maxValue, &minLoc, &maxLoc);
     return (int)(abs(minValue) > maxValue ? abs(minValue) : abs(maxValue));
+}
+
+Mat WebP::inzigzag(Mat input) {
+    if (input.rows != 1) {
+        cout<<"[ERROR]: inverse zigzag input wrong, the input mat is not one-dimensional"<<endl;
+    }
+    Mat result = Mat::zeros(sqrt(input.cols), sqrt(input.cols), CV_16S);
+    result.at<short>(0,0) = input.at<short>(0,0);
+    int i = 0, j = 1, k = 1;
+    int flag = 1, direction = 0;
+    while (1) {
+        if (k == input.cols - 1) {
+            result.at<short>(i, j) = input.at<short>(0, k);
+            break;
+        }
+        if (i == 0) {
+            if (flag == 0) {
+                if (j != result.cols - 1) {
+                    flag = 1;
+                    result.at<short>(i, j ++) = input.at<short>(0, k ++);
+                    continue;
+                }
+            } else {
+                flag = 0;
+                direction = 0;
+                result.at<short>(i++, j --) = input.at<short>(0, k ++);
+                continue;
+            }
+        }
+        if (j == 0) {
+            if (flag == 0) {
+                if (i != result.rows - 1) {
+                    flag = 1;
+                    result.at<short>(i++, j) = input.at<short>(0, k ++);
+                    continue;
+                }
+            } else {
+                flag = 0;
+                direction = 1;
+                result.at<short>(i --, j ++) = input.at<short>(0, k ++);
+                continue;
+            }
+        }
+        if (i == result.rows - 1) {
+            if (flag == 0) {
+                flag = 1;
+                result.at<short>(i, j ++) = input.at<short>(0, k ++);
+                continue;
+            } else {
+                flag = 0;
+                direction = 1;
+                result.at<short>(i --, j ++) = input.at<short>(0, k ++);
+                continue;
+            }
+        }
+        if (j == result.cols - 1) {
+            if (flag == 0) {
+                flag = 1;
+                result.at<short>(i++, j) = input.at<short>(0, k ++);
+                continue;
+            } else {
+                flag = 0;
+                direction = 0;
+                result.at<short>(i ++, j --) = input.at<short>(0, k ++);
+                continue;
+            }
+        }
+        if (direction) {
+            result.at<short>(i --, j ++) = input.at<short>(0, k ++);
+        } else {
+            result.at<short>(i ++, j --) = input.at<short>(0, k ++);
+        }
+    }
+    return result;
+}
+Mat WebP::indct(int block_num, int channel) {
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    int block_size = MACROBLOCKSIZE;
+    Mat channel_mat, zigzag_mat, residual_mat, reconstruct_mat, reconstruct_block_mat;
+    switch (channel) {
+        case Y_CHANNEL:
+            channel_mat = idct_Y;
+            reconstruct_mat = Y_reconstruct;
+            break;
+        case U_CHANNEL:
+            channel_mat = idct_U;
+            reconstruct_mat = U_reconstruct;
+            block_size /= 2; 
+            break;
+        case V_CHANNEL:
+            channel_mat = idct_V;
+            reconstruct_mat = V_reconstruct;
+            block_size /= 2; 
+            break;
+        default:
+            cout<<"[ERROR]: wrong channel!"<<endl;
+            exit(-1);
+            break;
+    }
+    zigzag_mat = channel_mat(Range(block_num, block_num + 1), Range(0, block_size * block_size)).clone();
+    Mat indct_mat = inzigzag(zigzag_mat);
+    indct_mat.convertTo(indct_mat, CV_32F);
+    idct(indct_mat, residual_mat);
+    reconstruct_block_mat = inpredictCoding(block_num, block_size, reconstruct_mat, residual_mat);    
+    Mat temp_mat = reconstruct_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size));
+    reconstruct_block_mat.copyTo(temp_mat);
+    return reconstruct_block_mat;
+}
+Mat WebP::inpredictCoding(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
+    int type = reconstruct_type.at(block_num);
+    Mat reconstruct_mat;
+    switch (type) {
+        case H_PRED :
+            reconstruct_mat = inhPredict(block_num, block_size, channel_mat, residual_mat);
+            break;
+        case V_PRED :
+            reconstruct_mat = invPredict(block_num, block_size, channel_mat, residual_mat);
+            break;
+        case DC_PRED :
+            reconstruct_mat = indcPredict(block_num, block_size, channel_mat, residual_mat);
+            break;
+        case TM_PRED :
+            reconstruct_mat = intmPredict(block_num, block_size, channel_mat, residual_mat);
+            break;
+        default :
+            cout<<"[ERROR]: Wrong reconstruction type!"<<endl;
+    }
+    return reconstruct_mat;
+}
+Mat WebP::reconstructImage() { 
+    Mat YUV_reconstruct;
+    int cols, rows;
+    cols = width % MACROBLOCKSIZE == 0 ? width : (width / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
+    rows = height % MACROBLOCKSIZE == 0 ? height : (height / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
+    Y_reconstruct.create(rows, cols, CV_16S);
+    U_reconstruct.create(rows / 2, cols / 2, CV_16S);
+    V_reconstruct.create(rows / 2, cols / 2, CV_16S);
+    YUV_reconstruct.create(rows, cols, CV_16SC3);
+
+    int block_num;
+    for (int i = 0; i < block_rows; i ++) {
+        for (int j = 0; j < block_cols; j ++) {
+            block_num = i * block_cols + j;
+            indct(block_num, Y_CHANNEL);
+            indct(block_num, U_CHANNEL);
+            indct(block_num, V_CHANNEL);
+        }
+    }
+
+    for (int i = 0; i < YUV_reconstruct.rows; i++) {
+        for (int j = 0; j < YUV_reconstruct.cols; j++) {
+            YUV_reconstruct.at<Vec3s>(i, j)[0] = Y_reconstruct.at<short>(i, j);
+            YUV_reconstruct.at<Vec3s>(i, j)[1] = U_reconstruct.at<short>(i / 2, j / 2);
+            YUV_reconstruct.at<Vec3s>(i, j)[2] = V_reconstruct.at<short>(i / 2, j / 2);
+        }
+    }
+    YUV_reconstruct.convertTo(YUV_reconstruct, CV_8UC3);
+    cvtColor(YUV_reconstruct, img_reconstruct_16base, COLOR_YUV2BGR);
+    img_reconstruct = Mat::zeros(height, width, CV_16S);
+    (img_reconstruct_16base(Range(0, height), Range(0, width))).copyTo(img_reconstruct);
+    return YUV_reconstruct;
+}
+void WebP::uncompress() {
+
+    //idct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
+    //idct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
+    //idct_V.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
+
+    reconstructImage();
+
+}
+
+Mat WebP::inhPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    Mat previous_col, residual_col, origin_col, origin_mat;
+    residual_mat.convertTo(residual_mat, CV_16S);
+    origin_mat = Mat::zeros(block_size, block_size, CV_16S);
+    if (block_col != 0) {
+        previous_col = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size));
+        for (int i = 0; i < block_size; i++) {
+            residual_col = residual_mat(Range(0, block_size), Range(i, i + 1));
+            origin_col = residual_col + previous_col;
+            origin_col.copyTo(origin_mat(Range(0, block_size), Range(i, i + 1)));
+            previous_col = origin_col.clone();
+        }
+    } else {
+        previous_col = Mat::zeros(block_size, 1, CV_16S);
+        for (int i = 0; i < block_size; i++) {
+            residual_col = residual_mat(Range(0, block_size), Range(i, i + 1));
+            origin_col = residual_col + previous_col;
+            origin_col.copyTo(origin_mat(Range(0, block_size), Range(i, i + 1)));
+            previous_col = origin_col.clone();
+        }
+    }
+    return origin_mat;
+}
+Mat WebP::invPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    Mat previous_row, residual_row, origin_row, origin_mat;
+    residual_mat.convertTo(residual_mat, CV_16S);
+    origin_mat = Mat::zeros(block_size, block_size, CV_16S);
+    if (block_row != 0) {
+        previous_row = channel_mat(Range(block_row * block_size - 1, block_row * block_size), Range(block_col * block_size, block_col * block_size + block_size));
+        for (int i = 0; i < block_size; i++) {
+            residual_row = residual_mat(Range(i, i + 1), Range(0, block_size));
+            origin_row = residual_row + previous_row;
+            origin_row.copyTo(origin_mat(Range(i, i + 1), Range(0, block_size)));
+            previous_row = origin_row.clone();
+        }
+    } else {
+        previous_row = Mat::zeros(1, block_size, CV_16S);
+        for (int i = 0; i < block_size; i++) {
+            residual_row = residual_mat(Range(i, i + 1), Range(0, block_size));
+            origin_row = residual_row + previous_row;
+            origin_row.copyTo(origin_mat(Range(i, i + 1), Range(0, block_size)));
+            previous_row = origin_row.clone();
+        }
+    }
+    //cout<<origin_mat<<endl;
+    return origin_mat;
+}
+Mat WebP::indcPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    Mat predictive_mat, origin_mat;
+    residual_mat.convertTo(residual_mat, CV_16S);
+    origin_mat = Mat::zeros(block_size, block_size, CV_16S);
+    predictive_mat = Mat::ones(block_size, block_size, CV_16S);
+    int mean0, mean1;
+    if (block_row != 0) {
+        Mat temp = channel_mat(Range(block_row * block_size - 1, block_row * block_size), Range(block_col * block_size , block_col * block_size + block_size));
+        mean0 = mean(temp).val[0];
+    } else {
+        mean0 = 0;
+    }
+    if (block_col != 0) {
+        Mat temp = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size));
+        mean1 = mean(temp).val[0];
+    } else {
+        mean1 = 0;
+    }
+    predictive_mat = predictive_mat * ((mean0 + mean1) / 2);
+    origin_mat = predictive_mat + residual_mat;
+    return origin_mat;
+}
+Mat WebP::intmPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
+    Mat predict_mat, origin_mat, left_col_mat, up_row_mat;
+    Mat temp_mat0, temp_mat1, temp_mat2; 
+    int block_row = block_num / block_cols;
+    int block_col = block_num % block_cols;
+    int leftup = 0;
+    residual_mat.convertTo(residual_mat, CV_16S);
+    if (block_row != 0) {
+        up_row_mat = channel_mat(Range(block_row * block_size - 1, block_row * block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
+    } else {
+        up_row_mat = Mat::zeros(1, block_size, CV_16S);
+    }
+    if (block_col != 0) {
+        left_col_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size)).clone();
+    } else {
+        left_col_mat = Mat::zeros(block_size, 1, CV_16S);
+    }
+    if (block_row != 0 && block_col != 0) {
+        leftup = channel_mat.at<short>(block_row * block_size - 1, block_col * block_size - 1);
+    }
+
+    temp_mat0 = Mat::ones(block_size, block_size, CV_16S);
+    temp_mat1 = Mat::ones(block_size, block_size, CV_16S);
+    temp_mat2 = Mat::ones(block_size, block_size, CV_16S) * leftup;
+    for (int i = 0; i < block_size; i++) {
+        left_col_mat.copyTo(temp_mat0(Range(0, block_size), Range(i, i + 1)));
+        up_row_mat.copyTo(temp_mat1(Range(i, i + 1), Range(0, block_size)));
+    }
+    predict_mat = temp_mat0 + temp_mat1 - temp_mat2;
+    origin_mat = predict_mat + residual_mat;
+    return origin_mat;
 }
