@@ -30,6 +30,8 @@ private:
     Mat dct_V;
     unsigned int block_rows, block_cols;
     vector<unsigned int> predict_type;
+
+    // compress
     void imagePretreatment(String path);
     void compress();
     void subSampling();
@@ -42,6 +44,16 @@ private:
     Mat dct(int block_num, int channel);
     int EuclideanDistance(Mat mat1, Mat mat2);
     int residualLength(Mat mat);
+    // decompress
+    Mat unzigzag(Mat input);
+    Mat undct(int block_num, int channel);
+    Mat unpredictCoding(int block_num, int channel);
+    Mat reconstructImage();
+    void uncompress();
+
+    // write and read
+    void writeData();
+    void readData();
 public:
     WebP();
     WebP(String path);
