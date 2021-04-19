@@ -36,6 +36,7 @@ private:
     Mat dct_Y, dct_U, dct_V;
 
     Mat img_reconstruct, img_reconstruct_16base;
+    Mat quantizationTable_Y, quantizationTable_UV;
     Mat idct_Y, idct_U, idct_V;
     Mat Y_reconstruct, U_reconstruct, V_reconstruct; 
     unsigned int block_rows, block_cols, height, width;
@@ -57,6 +58,7 @@ private:
     void imagePretreatment(String path);
     void compress();
     void subSampling();
+    void initQuantizationTable();
     Mat zigzag(Mat input);
     Mat predictiveCoding(int block_num, int channel);
     Mat hPredict(int block_num, int block_size, Mat channel_mat);
@@ -66,6 +68,7 @@ private:
     Mat dct(int block_num, int channel);
     int EuclideanDistance(Mat mat1, Mat mat2);
     int residualLength(Mat mat);
+
     // decompress
     Mat inzigzag(Mat input);
     Mat indct(int block_num, int channel);
@@ -95,8 +98,12 @@ private:
     // write and read
     void writeData();
     void writeTypeData();
+    void writeArithmeticCode();
+    void writeRunLengthCode();
     void readData();
     void readTypeData();
+    void readArithmeticCode();
+    void readRunLengthCode();
 public:
     WebP();
     WebP(String path);

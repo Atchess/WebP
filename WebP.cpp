@@ -2,13 +2,59 @@
 
 WebP::WebP(String path) {
     this->path = path;
-
+    initQuantizationTable();
     //test();
     compress();
     writeData();
     uncompress();
     imshow("test", img_reconstruct);
+    imwrite("p1.bmp", img_reconstruct);
+    Mat test = Y_reconstruct;
+    test.convertTo(test, CV_8U);
+    imshow("dd", test);
     waitKey();
+}
+
+void WebP::initQuantizationTable() {
+    short quan_Y[16][16] = {7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+                            , 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17
+                            , 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18
+                            , 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20
+                            , 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 18, 20, 22, 24, 26, 28, 30, 33
+                            , 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36
+                            , 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39
+                            , 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42
+                            , 1, 1, 1, 17, 18, 20, 2, 24, 26, 28, 30, 33, 36, 39, 42, 45
+                            , 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49
+                            , 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49, 52};
+    short quan_UV[8][8] = { 8, 8, 8, 9, 1, 1, 1, 1
+                            , 8, 8, 9, 1, 1, 1, 1, 14
+                            , 8, 9, 1, 1, 1, 1, 14, 15
+                            , 9, 1, 1, 1, 1, 14, 15, 16
+                            , 1, 1, 1, 1, 14, 15, 16, 18
+                            , 1, 1, 1, 14, 15, 16, 18, 20
+                            , 1, 1, 14, 15, 16, 18, 20, 22
+                            , 1, 14, 15, 16, 18, 20, 22, 23
+                            };
+//    short quan_UV[8][8] = { 1, 1, 1, 1, 1, 1, 1, 1
+//                            , 1, 1, 1, 1, 1, 1, 1, 14
+//                            , 1, 1, 1, 1, 1, 1, 14, 15
+//                            , 1, 1, 1, 1, 1, 14, 15, 16
+//                            , 1, 1, 1, 1, 14, 15, 16, 18
+//                            , 1, 1, 1, 14, 15, 16, 18, 20
+//                            , 1, 1, 14, 15, 16, 18, 20, 22
+//                            , 1, 14, 15, 16, 18, 20, 22, 23
+//                            };
+    quantizationTable_Y = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_16S, quan_Y).clone() * 4;
+    quantizationTable_UV = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_16S, quan_UV).clone() * 4;
+    //quantizationTable_Y = Mat::ones(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_16S);
+    //quantizationTable_UV = Mat::ones(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_16S);
+    //quantizationTable_Y.at<short>(0, 0) = 4;
 }
 
 void WebP::test() {
@@ -187,7 +233,7 @@ void WebP::imagePretreatment(String path) {
     img_origin = imread(path);
     Mat img_YUV, img_temp0, img_temp1, img_temp2;
     int cols, rows;
-    cvtColor(img_origin, img_YUV, COLOR_RGB2YUV);
+    cvtColor(img_origin, img_YUV, COLOR_RGB2YCrCb);
     cols = img_origin.cols % MACROBLOCKSIZE == 0 ? img_origin.cols : (img_origin.cols / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
     rows = img_origin.rows % MACROBLOCKSIZE == 0 ? img_origin.rows : (img_origin.rows / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
     height = img_origin.rows;
@@ -273,8 +319,8 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
         }
     }
     // add forecast method type to vector 
-    predict_type.push_back(index);
-    return temp_mat[index];
+    predict_type.push_back(2);
+    return temp_mat[2];
 }
 
 Mat WebP::hPredict(int block_num, int block_size, Mat channel_mat) {
@@ -384,6 +430,8 @@ Mat WebP::dct(int block_num, int channel) {
     cv::dct(residual_mat, result_mat);
     //cout<<residual_mat<<endl;
     //cout<<result_mat<<endl;
+    result_mat.convertTo(result_mat, CV_16S);
+    result_mat = result_mat / (channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
     return result_mat;
 }
 int WebP::residualLength(Mat mat) {
@@ -448,6 +496,7 @@ Mat WebP::indct(int block_num, int channel) {
     }
     zigzag_mat = channel_mat(Range(block_num, block_num + 1), Range(0, block_size * block_size)).clone();
     Mat indct_mat = inzigzag(zigzag_mat);
+    indct_mat = indct_mat.mul(channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
     indct_mat.convertTo(indct_mat, CV_32F);
     idct(indct_mat, residual_mat);
     reconstruct_block_mat = inpredictCoding(block_num, block_size, channel, residual_mat);    
@@ -525,7 +574,7 @@ Mat WebP::reconstructImage() {
         }
     }
     YUV_reconstruct.convertTo(YUV_reconstruct, CV_8UC3);
-    cvtColor(YUV_reconstruct, img_reconstruct_16base, COLOR_YUV2BGR);
+    cvtColor(YUV_reconstruct, img_reconstruct_16base, COLOR_YCrCb2RGB);
     img_reconstruct = Mat::zeros(height, width, CV_16S);
     (img_reconstruct_16base(Range(0, height), Range(0, width))).copyTo(img_reconstruct);
     return YUV_reconstruct;
@@ -535,14 +584,15 @@ void WebP::uncompress() {
     idct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
     idct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
     idct_V.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
-    reconstruct_type.assign(predict_type.begin(), predict_type.end());
+    //reconstruct_type.assign(predict_type.begin(), predict_type.end());
     //idct_Y = dct_Y.clone();
     //idct_U = dct_U.clone();
     //idct_V = dct_V.clone();
-    ivec_DAR_Y.assign(vec_DAR_Y.begin(), vec_DAR_Y.end());
-    ivec_DAR_U.assign(vec_DAR_U.begin(), vec_DAR_U.end());
-    ivec_DAR_V.assign(vec_DAR_V.begin(), vec_DAR_V.end());
+    //ivec_DAR_Y.assign(vec_DAR_Y.begin(), vec_DAR_Y.end());
+    //ivec_DAR_U.assign(vec_DAR_U.begin(), vec_DAR_U.end());
+    //ivec_DAR_V.assign(vec_DAR_V.begin(), vec_DAR_V.end());
     //deArithmeticCoding();
+    readData();
     deDPCMAndRimCoding();
     
     reconstructImage();
@@ -858,8 +908,33 @@ void WebP::writeData() {
     outfile.write((char *)&h, sizeof(short));
     outfile.write((char *)&w, sizeof(short));
     writeTypeData();
+    writeRunLengthCode();
     outfile.close();
-    readData();
+    //readData();
+    //for (int i = 0; i < predict_type.size(); i++) {
+    //    if (predict_type.at(i) != reconstruct_type.at(i)) {
+    //        cout <<"wrong"<<endl;
+    //    }
+    //}
+    //for (int i = 0; i < vec_DAR_Y.size(); i++) {
+    //    if (vec_DAR_Y.at(i) != ivec_DAR_Y.at(i)) {
+    //        cout<<i<<endl;
+    //        cout<<vec_DAR_Y.at(i)<<" "<<ivec_DAR_Y.at(i)<<endl;
+    //    }
+    //}
+    //for (int i = 0; i < vec_DAR_U.size(); i++) {
+    //    if (vec_DAR_U.at(i) != ivec_DAR_U.at(i)) {
+    //        cout<<i<<endl;
+    //    }
+    //}
+    //for (int i = 0; i < vec_DAR_V.size(); i++) {
+    //    if (vec_DAR_V.at(i) != ivec_DAR_V.at(i)) {
+    //        cout<<i<<endl;
+    //    }
+    //}
+    //cout<<"end"<<endl;
+    
+    
 }
 
 void WebP::writeTypeData() {
@@ -876,16 +951,75 @@ void WebP::writeTypeData() {
     outfile.write(&buffer, sizeof(char));
 }
 
+
+void WebP::writeArithmeticCode() {
+
+}
+
+void WebP::writeRunLengthCode() {
+    int block_num = block_cols * block_rows;
+    short num_s;
+    char num_c;
+
+    lenBeforeArith_Y = vec_DAR_Y.size();
+    lenBeforeArith_U = vec_DAR_U.size();
+    lenBeforeArith_V = vec_DAR_V.size();
+
+    outfile.write((char *)&lenBeforeArith_Y, sizeof(int));
+    outfile.write((char *)&lenBeforeArith_U, sizeof(int));
+    outfile.write((char *)&lenBeforeArith_V, sizeof(int));
+
+    for (int i = 0; i < lenBeforeArith_Y; i++) {
+        if (i < block_num) {
+            num_s = (short)vec_DAR_Y.at(i);
+            outfile.write((char *)&num_s, sizeof(short));
+        } else {
+            num_c = (char)vec_DAR_Y.at(i);
+            outfile.write(&num_c, sizeof(char));
+            //num_s = (short)vec_DAR_Y.at(i);
+            //outfile.write((char *)&num_s, sizeof(short));
+        }
+    }
+    for (int i = 0; i < lenBeforeArith_U; i++) {
+        if (i < block_num) {
+            num_s = (short)vec_DAR_U.at(i);
+            outfile.write((char *)&num_s, sizeof(short));
+        } else {
+            num_c = (char)vec_DAR_U.at(i);
+            outfile.write(&num_c, sizeof(char));
+            //num_s = (short)vec_DAR_U.at(i);
+            //outfile.write((char *)&num_s, sizeof(short));
+        }
+    }
+    for (int i = 0; i < lenBeforeArith_V; i++) {
+        if (i < block_num) {
+            num_s = (short)vec_DAR_V.at(i);
+            outfile.write((char *)&num_s, sizeof(short));
+        } else {
+            num_c = (char)vec_DAR_V.at(i);
+            outfile.write(&num_c, sizeof(char));
+            //num_s = (short)vec_DAR_V.at(i);
+            //outfile.write((char *)&num_s, sizeof(short));
+        }
+    }
+    
+}
+
+
 void WebP::readData() {
+    filename = "test.bin";
     infile.open(filename, ios::binary);
     short h, w;
     infile.read((char *)&h, sizeof(short));
     infile.read((char *)&w, sizeof(short));
+    width = w;
+    height = h;
     int cols = width % MACROBLOCKSIZE == 0 ? width : (width / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
     int rows = height % MACROBLOCKSIZE == 0 ? height : (height / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
     block_cols = cols / MACROBLOCKSIZE;
     block_rows = rows / MACROBLOCKSIZE;
     readTypeData();
+    readRunLengthCode();
     infile.close();
 }
 
@@ -897,5 +1031,56 @@ void WebP::readTypeData() {
         reconstruct_type.push_back(BIT23(buffer));
         reconstruct_type.push_back(BIT45(buffer));
         reconstruct_type.push_back(BIT67(buffer));
+    }
+}
+
+void WebP::readArithmeticCode() {
+
+}
+
+void WebP::readRunLengthCode() {
+    int block_num = block_cols * block_rows;
+    short num_s;
+    char num_c;
+
+    infile.read((char *)&lenBeforeArith_Y, sizeof(int));
+    infile.read((char *)&lenBeforeArith_U, sizeof(int));
+    infile.read((char *)&lenBeforeArith_V, sizeof(int));
+
+    for (int i = 0; i < lenBeforeArith_Y; i++) {
+        if (i < block_num) {
+            infile.read((char *)&num_s, sizeof(short));
+            ivec_DAR_Y.push_back(num_s);
+        } else {
+            infile.read(&num_c, sizeof(char));
+            ivec_DAR_Y.push_back((short)num_c);
+            //i ++;
+            //infile.read((char *)&num_s, sizeof(short));
+            //ivec_DAR_Y.push_back((short)num_s);
+        }
+    }
+    for (int i = 0; i < lenBeforeArith_U; i++) {
+        if (i < block_num) {
+            infile.read((char *)&num_s, sizeof(short));
+            ivec_DAR_U.push_back(num_s);
+        } else {
+            infile.read(&num_c, sizeof(char));
+            ivec_DAR_U.push_back((short)num_c);
+            //i ++;
+            //infile.read((char *)&num_s, sizeof(short));
+            //ivec_DAR_U.push_back((short)num_s);
+        }
+    }
+    for (int i = 0; i < lenBeforeArith_V; i++) {
+        if (i < block_num) {
+            infile.read((char *)&num_s, sizeof(short));
+            ivec_DAR_V.push_back(num_s);
+        } else {
+            infile.read(&num_c, sizeof(char));
+            ivec_DAR_V.push_back((short)num_c);
+            //i ++;
+            //infile.read((char *)&num_s, sizeof(short));
+            //ivec_DAR_V.push_back((short)num_s);
+        }
     }
 }
