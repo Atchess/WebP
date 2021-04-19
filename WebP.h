@@ -60,6 +60,8 @@ private:
     Mat reconstructImage();
     void uncompress();
 
+    void test();
+
     // write and read
     void writeData();
     void readData();
