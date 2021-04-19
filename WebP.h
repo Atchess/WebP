@@ -3,8 +3,10 @@
 
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <math.h>
+#include "MyRange.h"
 
 using namespace cv;
 using namespace std;
@@ -21,6 +23,12 @@ using namespace std;
 #define INF 100000
 #define MACROBLOCKSIZE 16
 
+#define BIT67(ch) ((unsigned int)((192 & ch) >> 6))
+#define BIT45(ch) ((unsigned int)((48 & ch) >> 4))
+#define BIT23(ch) ((unsigned int)((12 & ch) >> 2))
+#define BIT01(ch) ((unsigned int)(3 & ch))
+
+
 class WebP {
 private:
     Mat Y, U, V;
@@ -34,7 +42,16 @@ private:
     vector<unsigned int> predict_type;
     vector<unsigned int> reconstruct_type;
 
-    String path;
+    String path, filename;
+    ofstream outfile;
+    ifstream infile;
+
+    map<short, MyRange> arithmeticMap_Y, arithmeticMap_U, arithmeticMap_V;
+    vector<short> vec_DAR_Y, vec_DAR_U, vec_DAR_V;
+    int lenBeforeArith_Y, lenBeforeArith_U, lenBeforeArith_V;
+    double res_Y, res_U, res_V;
+
+    vector<short> ivec_DAR_Y, ivec_DAR_U, ivec_DAR_V;
 
     // compress
     void imagePretreatment(String path);
@@ -52,7 +69,7 @@ private:
     // decompress
     Mat inzigzag(Mat input);
     Mat indct(int block_num, int channel);
-    Mat inpredictCoding(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
+    Mat inpredictCoding(int block_num, int block_size, int channel, Mat residual_mat);
     Mat inhPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
     Mat invPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
     Mat indcPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
@@ -62,9 +79,24 @@ private:
 
     void test();
 
+    vector<short> DPCMAndRim(Mat mat);
+    void DPCMAndRimCoding();
+
+    Mat deDPCMAndRim(vector<short> vec, int channel);
+    void deDPCMAndRimCoding();
+    
+    double arithmetic(vector<short> vec,map<short, MyRange>* arithmeticMap, int* lenBeforeArith);
+    void arithmeticCoding();
+
+    vector<short> deArithmetic(double code, int channel);
+    void deArithmeticCoding();
+
+
     // write and read
     void writeData();
+    void writeTypeData();
     void readData();
+    void readTypeData();
 public:
     WebP();
     WebP(String path);

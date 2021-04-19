@@ -3,14 +3,16 @@
 WebP::WebP(String path) {
     this->path = path;
 
-    test();
+    //test();
     compress();
-    
-    idct_Y = dct_Y.clone();
-    idct_U = dct_U.clone();
-    idct_V = dct_V.clone();
-    reconstruct_type.assign(predict_type.begin(), predict_type.end());
-    uncompress();
+    try
+    {
+        uncompress();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
     imshow("test", img_reconstruct);
     waitKey();
 }
@@ -21,14 +23,14 @@ void WebP::test() {
     subSampling();
     int block_num;
     Mat temp0, temp1, temp2;
-    Mat y_pre, u_pre, v_pre, yn, un, vn;
+    Mat y_pre, u_pre, v_pre;
     y_pre = Y.clone();
     u_pre = U.clone();
     v_pre = V.clone();
 
-    yn.create(Y.rows, Y.cols, CV_16S);
-    un.create(U.rows, U.cols, CV_16S);
-    vn.create(V.rows, V.cols, CV_16S);
+    Y_reconstruct.create(Y.rows, Y.cols, CV_16S);
+    U_reconstruct.create(U.rows, U.cols, CV_16S);
+    V_reconstruct.create(V.rows, V.cols, CV_16S);
 
     for (int i = 0; i < block_rows; i ++) {
         for (int j = 0; j < block_cols; j ++) {
@@ -45,7 +47,7 @@ void WebP::test() {
             cv::dct(temp1, temp1);
             cv::dct(temp2, temp2);
 
-            cout<<temp0<<endl;
+            //cout<<temp0<<endl;
 
             //temp0.convertTo(temp0, CV_16S);
             //temp1.convertTo(temp1, CV_16S);
@@ -64,7 +66,7 @@ void WebP::test() {
             temp1.convertTo(temp1, CV_32F);
             temp2.convertTo(temp2, CV_32F);
 
-            cout<<temp0<<endl;
+            //cout<<temp0<<endl;
 
             cv::idct(temp0, temp0);
             cv::idct(temp1, temp1);            
@@ -84,13 +86,20 @@ void WebP::test() {
     for (int i = 0; i < block_rows; i ++) {
         for (int j = 0; j < block_cols; j ++) {
             block_num = i * block_cols + j;
-            temp0 = inpredictCoding(block_num, MACROBLOCKSIZE, yn, y_pre(Range(i * MACROBLOCKSIZE, (i + 1) * MACROBLOCKSIZE), Range(j * MACROBLOCKSIZE, (j + 1) * MACROBLOCKSIZE)));
-            temp1 = inpredictCoding(block_num, MACROBLOCKSIZE / 2, un, u_pre(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-            temp2 = inpredictCoding(block_num, MACROBLOCKSIZE / 2, vn, v_pre(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-
-            temp0.copyTo(yn(Range(i * MACROBLOCKSIZE, (i + 1) * MACROBLOCKSIZE), Range(j * MACROBLOCKSIZE, (j + 1) * MACROBLOCKSIZE)));
-            temp1.copyTo(un(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-            temp2.copyTo(vn(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
+            try
+            {
+            temp0 = inpredictCoding(block_num, MACROBLOCKSIZE, Y_CHANNEL, y_pre(Range(i * MACROBLOCKSIZE, (i + 1) * MACROBLOCKSIZE), Range(j * MACROBLOCKSIZE, (j + 1) * MACROBLOCKSIZE)));
+            temp1 = inpredictCoding(block_num, MACROBLOCKSIZE / 2, U_CHANNEL, u_pre(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
+            temp2 = inpredictCoding(block_num, MACROBLOCKSIZE / 2, V_CHANNEL, v_pre(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
+            }
+            catch(const std::exception& e)
+            {
+                std::cerr << e.what() << '\n';
+            }
+            
+            temp0.copyTo(Y_reconstruct(Range(i * MACROBLOCKSIZE, (i + 1) * MACROBLOCKSIZE), Range(j * MACROBLOCKSIZE, (j + 1) * MACROBLOCKSIZE)));
+            temp1.copyTo(U_reconstruct(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
+            temp2.copyTo(V_reconstruct(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
 
         }
     }
@@ -98,20 +107,20 @@ void WebP::test() {
     YUVn.create(Y.rows, Y.cols, CV_16SC3);
     for (int i = 0; i < YUVn.rows; i++) {
         for (int j = 0; j < YUVn.cols; j++) {
-            YUVn.at<Vec3s>(i, j)[0] = yn.at<short>(i, j);
-            YUVn.at<Vec3s>(i, j)[1] = un.at<short>(i / 2, j / 2);
-            YUVn.at<Vec3s>(i, j)[2] = vn.at<short>(i / 2, j / 2);
+            YUVn.at<Vec3s>(i, j)[0] = Y_reconstruct.at<short>(i, j);
+            YUVn.at<Vec3s>(i, j)[1] = U_reconstruct.at<short>(i / 2, j / 2);
+            YUVn.at<Vec3s>(i, j)[2] = V_reconstruct.at<short>(i / 2, j / 2);
         }
     }
     YUVn.convertTo(temp0, CV_8UC3);
     Mat test;
     cvtColor(temp0, test, COLOR_YUV2BGR);
     imshow("drrd", test);
-    yn.convertTo(temp0, CV_8U);
+    Y_reconstruct.convertTo(temp0, CV_8U);
     imshow("dd", temp0);
-    vn.convertTo(temp0, CV_8U);
+    V_reconstruct.convertTo(temp0, CV_8U);
     imshow("ddf", temp0);
-    un.convertTo(temp0, CV_8U);
+    U_reconstruct.convertTo(temp0, CV_8U);
     imshow("drd", temp0);
     waitKey();
 }
@@ -148,7 +157,8 @@ void WebP::compress() {
             zig_block_V.copyTo(mat_temp);
         }
     }
-
+    DPCMAndRimCoding();
+    //arithmeticCoding();
 }
 
 // the function is so bad, but i don't want to rewrite it. 
@@ -269,8 +279,8 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
         }
     }
     // add forecast method type to vector 
-    predict_type.push_back(3);
-    return temp_mat[3];
+    predict_type.push_back(index);
+    return temp_mat[index];
 }
 
 Mat WebP::hPredict(int block_num, int block_size, Mat channel_mat) {
@@ -446,17 +456,38 @@ Mat WebP::indct(int block_num, int channel) {
     Mat indct_mat = inzigzag(zigzag_mat);
     indct_mat.convertTo(indct_mat, CV_32F);
     idct(indct_mat, residual_mat);
-    reconstruct_block_mat = inpredictCoding(block_num, block_size, reconstruct_mat, residual_mat);    
+    reconstruct_block_mat = inpredictCoding(block_num, block_size, channel, residual_mat);    
     Mat temp_mat = reconstruct_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size));
     reconstruct_block_mat.copyTo(temp_mat);
     return reconstruct_block_mat;
 }
-Mat WebP::inpredictCoding(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
-    int type = reconstruct_type.at(block_num);
-    Mat reconstruct_mat;
+Mat WebP::inpredictCoding(int block_num, int block_size, int channel, Mat residual_mat) {
+    int type = reconstruct_type.at(block_num * 3 + channel);
+    Mat reconstruct_mat, channel_mat;
+    switch (channel) {
+        case Y_CHANNEL:
+            channel_mat = Y_reconstruct;
+            break;
+        case U_CHANNEL:
+            channel_mat = U_reconstruct;
+            break;
+        case V_CHANNEL:
+            channel_mat = V_reconstruct;
+            break;
+        default:
+            cout<<"[ERROR]: wrong channel!"<<endl;
+            exit(-1);
+            break;
+    }
     switch (type) {
         case H_PRED :
+            try {
             reconstruct_mat = inhPredict(block_num, block_size, channel_mat, residual_mat);
+            }
+            catch(const std::exception& e)
+            {
+                std::cerr << e.what() << '\n';
+            }
             break;
         case V_PRED :
             reconstruct_mat = invPredict(block_num, block_size, channel_mat, residual_mat);
@@ -507,10 +538,19 @@ Mat WebP::reconstructImage() {
 }
 void WebP::uncompress() {
 
-    //idct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
-    //idct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
-    //idct_V.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
-
+    idct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
+    idct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
+    idct_V.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
+    reconstruct_type.assign(predict_type.begin(), predict_type.end());
+    //idct_Y = dct_Y.clone();
+    //idct_U = dct_U.clone();
+    //idct_V = dct_V.clone();
+    ivec_DAR_Y.assign(vec_DAR_Y.begin(), vec_DAR_Y.end());
+    ivec_DAR_U.assign(vec_DAR_U.begin(), vec_DAR_U.end());
+    ivec_DAR_V.assign(vec_DAR_V.begin(), vec_DAR_V.end());
+    //deArithmeticCoding();
+    deDPCMAndRimCoding();
+    
     reconstructImage();
 
 }
@@ -621,4 +661,261 @@ Mat WebP::intmPredict(int block_num, int block_size, Mat channel_mat, Mat residu
     predict_mat = temp_mat0 + temp_mat1 - temp_mat2;
     origin_mat = predict_mat + residual_mat;
     return origin_mat;
+}
+
+
+vector<short> WebP::DPCMAndRim(Mat mat) {
+    vector<short> res;    //result of dpcm and rim-length
+
+    res.push_back(mat.at<short>(0, 0));
+    for (int i = 1; i < mat.rows; i++) {
+        res.push_back(mat.at<short>(i, 0) - mat.at<short>(i - 1, 0));
+    }
+
+    for (int i = 0; i < mat.rows; i++) {
+        int zeroCounter = 0;
+        for (int j = 1; j < mat.cols; j++) {
+            if (mat.at<short>(i, j) == 0 && j != mat.cols - 1) {
+                zeroCounter++;
+            }
+            else {
+                res.push_back(zeroCounter);
+                res.push_back(mat.at<short>(i, j));
+                zeroCounter = 0;
+            }
+        }
+    }
+    return res;
+}
+
+void WebP::DPCMAndRimCoding() {
+    vec_DAR_Y = DPCMAndRim(dct_Y);
+    vec_DAR_U = DPCMAndRim(dct_U);
+    vec_DAR_V = DPCMAndRim(dct_V);
+}
+
+Mat WebP::deDPCMAndRim(vector<short> vec, int channel) {
+
+    int DCNumber = block_rows * block_cols;
+    int col = 0;
+    Mat resMat;
+    switch (channel)
+    {
+    case Y_CHANNEL:
+        col = MACROBLOCKSIZE * MACROBLOCKSIZE;
+        break;
+    case U_CHANNEL:
+        col = MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2;
+        break;
+    case V_CHANNEL:
+        col = MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2;
+        break;
+    default:
+        break;
+    }
+    resMat.create(DCNumber, col, CV_16S);
+
+    resMat.at<short>(0, 0) = vec[0];
+    for (int i = 1; i < DCNumber; i++) {
+        resMat.at<short>(i, 0) = resMat.at<short>(i - 1, 0) + vec[i];
+    }
+
+    int zeroFlag = 1;
+    int rowCounter = 0;
+    int colCounter = 1;
+    for (int i = DCNumber; i < vec.size(); i++) {
+        if (zeroFlag) {
+            for (int j = 0; j < vec[i]; j++) {
+                resMat.at<short>(rowCounter, colCounter) = 0;
+                colCounter++;
+            }
+            zeroFlag = 0;
+        }
+        else {
+            resMat.at<short>(rowCounter, colCounter) = vec[i];
+            colCounter++;
+            zeroFlag = 1;
+            if (colCounter == col) {
+                colCounter = 1;
+                rowCounter++;
+            }
+        }
+    }
+    return resMat;
+}
+
+void WebP::deDPCMAndRimCoding() {
+    
+    idct_Y = deDPCMAndRim(ivec_DAR_Y, Y_CHANNEL);
+    idct_U = deDPCMAndRim(ivec_DAR_U, U_CHANNEL);
+    idct_V = deDPCMAndRim(ivec_DAR_V, V_CHANNEL);
+}
+
+double WebP::arithmetic(vector<short> vec, map<short, MyRange> * arithmeticMap, int * lenBeforeArith) {
+    
+    map<short, int> frequencyMap;
+    for (vector<short>::iterator it = vec.begin(); it != vec.end(); it++) {
+        frequencyMap.insert(pair<short, int>(*it, 0));
+        frequencyMap[*it]++;
+    }
+    
+    int totalFrequency = 0;
+    for (map<short, int>::iterator it = frequencyMap.begin(); it != frequencyMap.end(); it++) {
+        totalFrequency += it->second;
+    }
+
+    double low = 0.0, high = 0.0;
+    (*arithmeticMap).clear();
+    for (map<short, int>::iterator it = frequencyMap.begin(); it != frequencyMap.end(); it++) {
+        high = low + it->second * 1.0 / totalFrequency;
+        MyRange range;
+        range.start = low;
+        range.end = high;
+        (*arithmeticMap).insert(pair<short, MyRange>(it->first, range));
+        low = high;
+    }
+
+    /*for (map<short, MyRange>::iterator it = arithmeticMap.begin(); it != arithmeticMap.end(); it++) {
+        cout << it->first << "-" << it->second.start << "," << it->second.end << endl;
+    }*/
+
+    (*lenBeforeArith) = 0;
+    double lowRange = 0.0, highRange = 1.0;
+    for (vector<short>::iterator it = vec.begin(); it != vec.end(); it++) {
+        double delta = highRange - lowRange;
+        highRange = lowRange + delta * (*arithmeticMap)[*it].end;
+        lowRange = lowRange + delta * (*arithmeticMap)[*it].start;
+        (*lenBeforeArith)++;
+    }
+
+    return lowRange;
+}
+
+void WebP::arithmeticCoding() {
+    res_Y = arithmetic(vec_DAR_Y, &(arithmeticMap_Y), &(lenBeforeArith_Y));
+    res_U = arithmetic(vec_DAR_U, &(arithmeticMap_U), &(lenBeforeArith_U));
+    res_V = arithmetic(vec_DAR_V, &(arithmeticMap_V), &(lenBeforeArith_V));
+}
+
+vector<short> WebP::deArithmetic(double code, int channel) {
+    double lowInterval;
+    double highInterval;
+    vector<short> resVec;
+    map<short, MyRange> arithmeticMap;
+    int lenBeforeArith;
+
+    switch (channel)
+    {
+    case Y_CHANNEL:
+        arithmeticMap = arithmeticMap_Y;
+        lenBeforeArith = lenBeforeArith_Y;
+        break;
+    case U_CHANNEL:
+        arithmeticMap = arithmeticMap_U;
+        lenBeforeArith = lenBeforeArith_U;
+        break;
+    case V_CHANNEL:
+        arithmeticMap = arithmeticMap_V;
+        lenBeforeArith = lenBeforeArith_V;
+        break;
+    default:
+        break;
+    }
+    for (map<short, MyRange>::iterator it = arithmeticMap.begin(); it != arithmeticMap.end(); it++) {
+        if ((it->second).start <= code && (it->second).end>code) {
+            lowInterval = (it->second).start;
+            highInterval = (it->second).end;
+            resVec.push_back(it->first);
+            break;
+        }
+    }
+
+    for (int i = 0; i < lenBeforeArith - 1; i++) {
+        double deltaInterval;
+        deltaInterval = highInterval - lowInterval;
+        code -= lowInterval;
+        code /= deltaInterval;
+
+        for (map<short, MyRange>::iterator it = arithmeticMap.begin(); it != arithmeticMap.end(); it++) {
+            if ((it->second).start <= code && (it->second).end>code) {
+                lowInterval = (it->second).start;
+                highInterval = (it->second).end;
+                resVec.push_back(it->first);
+                break;
+            }
+        }
+    }
+    return resVec;
+}
+
+void WebP::deArithmeticCoding() {
+
+    ivec_DAR_Y = deArithmetic(res_Y, Y_CHANNEL);
+    ivec_DAR_U = deArithmetic(res_U, U_CHANNEL);
+    ivec_DAR_V = deArithmetic(res_V, V_CHANNEL);
+
+}
+
+void WebP::writeData() {
+    outfile.open(filename);
+    unsigned short h = height;
+    unsigned short w = width;
+    outfile.write((char *)&h, sizeof(short));
+    outfile.write((char *)&w, sizeof(short));
+    writeTypeData();
+    outfile.close();
+
+    readData();
+    try
+    {
+        int j = predict_type.size();
+        int k = reconstruct_type.size();
+    for (int i = 0; i < predict_type.size(); i++) {
+        cout<<predict_type.at(i)<<"<--->"<<reconstruct_type.at(i)<<endl;
+    }    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    int i = 0;
+    i++;
+    cout<<i<<endl;
+}
+
+void WebP::writeTypeData() {
+    char buffer = 0;
+    int type, i;
+    for (i = 0; i < predict_type.size(); i++) {
+        type = predict_type.at(i);
+        buffer = buffer | (type << (( i % 4 ) * 2));
+        if (i % 4 == 3) {
+            outfile.write(&buffer, sizeof(char));
+            buffer = 0;
+        }
+    }
+    outfile.write(&buffer, sizeof(char));
+}
+
+void WebP::readData() {
+    infile.open(filename);
+    short h, w;
+    infile.read((char *)&h, sizeof(short));
+    infile.read((char *)&w, sizeof(short));
+    int cols = width % MACROBLOCKSIZE == 0 ? width : (width / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
+    int rows = height % MACROBLOCKSIZE == 0 ? height : (height / MACROBLOCKSIZE + 1) * MACROBLOCKSIZE;
+    block_cols = cols / MACROBLOCKSIZE;
+    block_rows = rows / MACROBLOCKSIZE;
+    readTypeData();
+    infile.close();
+}
+
+void WebP::readTypeData() {
+    char buffer = 0;
+    for (int i = 0; i <= block_cols * block_rows / 4; i++) {
+        infile.read(&buffer, sizeof(char));
+        reconstruct_type.push_back(BIT01(buffer));
+        reconstruct_type.push_back(BIT23(buffer));
+        reconstruct_type.push_back(BIT45(buffer));
+        reconstruct_type.push_back(BIT67(buffer));
+    }
 }
