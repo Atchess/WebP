@@ -1,5 +1,5 @@
 # WebP
-implement WebP image Compression algorithm with c++ and opencv by aiqi and dongchen
+implement WebP image Compression algorithm with c++ and opencv by aiqi and dongchen with **many bugs**
 
 | | C1 | C2 | C3 | C4
 |---|---|---|---|---|
