@@ -5,14 +5,8 @@ WebP::WebP(String path) {
 
     //test();
     compress();
-    try
-    {
-        uncompress();
-    }
-    catch(const std::exception& e)
-    {
-        std::cerr << e.what() << '\n';
-    }
+    writeData();
+    uncompress();
     imshow("test", img_reconstruct);
     waitKey();
 }
@@ -857,29 +851,15 @@ void WebP::deArithmeticCoding() {
 }
 
 void WebP::writeData() {
-    outfile.open(filename);
+    filename = "test.bin";
+    outfile.open(filename, ios::binary);
     unsigned short h = height;
     unsigned short w = width;
     outfile.write((char *)&h, sizeof(short));
     outfile.write((char *)&w, sizeof(short));
     writeTypeData();
     outfile.close();
-
     readData();
-    try
-    {
-        int j = predict_type.size();
-        int k = reconstruct_type.size();
-    for (int i = 0; i < predict_type.size(); i++) {
-        cout<<predict_type.at(i)<<"<--->"<<reconstruct_type.at(i)<<endl;
-    }    }
-    catch(const std::exception& e)
-    {
-        std::cerr << e.what() << '\n';
-    }
-    int i = 0;
-    i++;
-    cout<<i<<endl;
 }
 
 void WebP::writeTypeData() {
@@ -897,7 +877,7 @@ void WebP::writeTypeData() {
 }
 
 void WebP::readData() {
-    infile.open(filename);
+    infile.open(filename, ios::binary);
     short h, w;
     infile.read((char *)&h, sizeof(short));
     infile.read((char *)&w, sizeof(short));
@@ -911,7 +891,7 @@ void WebP::readData() {
 
 void WebP::readTypeData() {
     char buffer = 0;
-    for (int i = 0; i <= block_cols * block_rows / 4; i++) {
+    for (int i = 0; i <= block_cols * block_rows * 3 / 4; i++) {
         infile.read(&buffer, sizeof(char));
         reconstruct_type.push_back(BIT01(buffer));
         reconstruct_type.push_back(BIT23(buffer));
