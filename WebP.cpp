@@ -3,24 +3,53 @@
 WebP::WebP(String path) {
     this->path = path;
     initQuantizationTable();
+    initDctMat();
     //test();
     compress();
     writeData();
     uncompress();
     imshow("test", img_reconstruct);
     imwrite("p1.bmp", img_reconstruct);
-    Mat test = Y_reconstruct;
+    Mat test = U_reconstruct;
     test.convertTo(test, CV_8U);
     imshow("dd", test);
+    test = Y_reconstruct;
+    test.convertTo(test, CV_8U);
+    imshow("ddY", test);
     waitKey();
 }
 
 void WebP::initQuantizationTable() {
-    short quan_Y[16][16] = {7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-                            , 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17
-                            , 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18
-                            , 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20
-                            , 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22
+    //float quan_Y[16][16] = {7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+    //                        , 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17
+    //                        , 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18
+    //                        , 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20
+    //                        , 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22
+    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24
+    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26
+    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28
+    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30
+    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 18, 20, 22, 24, 26, 28, 30, 33
+    //                        , 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36
+    //                        , 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39
+    //                        , 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42
+    //                        , 1, 1, 1, 17, 18, 20, 2, 24, 26, 28, 30, 33, 36, 39, 42, 45
+    //                        , 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49
+    //                        , 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49, 52};
+    float quan_UV[8][8] = { 4, 1.5, 1, 1, 1, 1, 1, 1
+                            , 1.5, 1, 1, 1, 1, 1, 1, 14
+                            , 1, 1, 1, 1, 1, 1, 14, 15
+                            , 1, 1, 1, 1, 1, 14, 15, 16
+                            , 1, 1, 1, 1, 14, 15, 16, 18
+                            , 1, 1, 1, 14, 15, 16, 18, 20
+                            , 1, 1, 14, 15, 16, 18, 20, 22
+                            , 1, 14, 15, 16, 18, 20, 22, 23
+                            };
+    float quan_Y[16][16] = { 8, 2, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+                            , 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17
+                            , 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22
                             , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24
                             , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26
                             , 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28
@@ -32,29 +61,43 @@ void WebP::initQuantizationTable() {
                             , 1, 1, 1, 17, 18, 20, 2, 24, 26, 28, 30, 33, 36, 39, 42, 45
                             , 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49
                             , 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49, 52};
-    short quan_UV[8][8] = { 8, 8, 8, 9, 1, 1, 1, 1
-                            , 8, 8, 9, 1, 1, 1, 1, 14
-                            , 8, 9, 1, 1, 1, 1, 14, 15
-                            , 9, 1, 1, 1, 1, 14, 15, 16
-                            , 1, 1, 1, 1, 14, 15, 16, 18
-                            , 1, 1, 1, 14, 15, 16, 18, 20
-                            , 1, 1, 14, 15, 16, 18, 20, 22
-                            , 1, 14, 15, 16, 18, 20, 22, 23
-                            };
-//    short quan_UV[8][8] = { 1, 1, 1, 1, 1, 1, 1, 1
-//                            , 1, 1, 1, 1, 1, 1, 1, 14
-//                            , 1, 1, 1, 1, 1, 1, 14, 15
-//                            , 1, 1, 1, 1, 1, 14, 15, 16
-//                            , 1, 1, 1, 1, 14, 15, 16, 18
-//                            , 1, 1, 1, 14, 15, 16, 18, 20
-//                            , 1, 1, 14, 15, 16, 18, 20, 22
-//                            , 1, 14, 15, 16, 18, 20, 22, 23
-//                            };
-    quantizationTable_Y = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_16S, quan_Y).clone() * 4;
-    quantizationTable_UV = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_16S, quan_UV).clone() * 4;
-    //quantizationTable_Y = Mat::ones(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_16S);
-    //quantizationTable_UV = Mat::ones(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_16S);
-    //quantizationTable_Y.at<short>(0, 0) = 4;
+    //float quan_UV[8][8] = { 8, 8, 8, 9, 1, 1, 1, 1
+    //                        , 8, 8, 9, 1, 1, 1, 1, 14
+    //                        , 8, 9, 1, 1, 1, 1, 14, 15
+    //                        , 9, 1, 1, 1, 1, 14, 15, 16
+    //                        , 1, 1, 1, 1, 14, 15, 16, 18
+    //                        , 1, 1, 1, 14, 15, 16, 18, 20
+    //                        , 1, 1, 14, 15, 16, 18, 20, 22
+    //                        , 1, 14, 15, 16, 18, 20, 22, 23
+    //                        };
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            if (quan_UV[i][j] == 1) {
+                quan_UV[i][j] = 0.1;
+            } else {
+                quan_UV[i][j] = 1;
+            }
+        }
+    }
+//
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
+            if (quan_Y[i][j] == 1) {
+                quan_Y[i][j] = 0.1;
+            } else {
+                quan_Y[i][j] = 1;
+            }
+        }
+    }
+    quantizationTable_Y = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, quan_Y).clone();
+    quantizationTable_UV = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F, quan_UV).clone();
+    //quantizationTable_Y = Mat::ones(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F) / 10.0;
+    //quantizationTable_UV = Mat::ones(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F) / 10.0;
+    //quantizationTable_Y.at<float>(0, 0) = 8;
+    //quantizationTable_Y.at<float>(0, 1) = 4;
+    //quantizationTable_Y.at<float>(1, 0) = 4;
+    //quantizationTable_Y.at<float>(1, 1) = 2;
+    //quantizationTable_UV.at<float>(0, 0) = 4;
 }
 
 void WebP::test() {
@@ -197,6 +240,11 @@ void WebP::compress() {
             zig_block_V.copyTo(mat_temp);
         }
     }
+    int hist[4] = {0};
+    for (int i = 0; i < predict_type.size(); i++) {
+        hist[predict_type.at(i)] ++;
+    }
+    
     DPCMAndRimCoding();
     //arithmeticCoding();
 }
@@ -319,8 +367,8 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
         }
     }
     // add forecast method type to vector 
-    predict_type.push_back(2);
-    return temp_mat[2];
+    predict_type.push_back(3);
+    return temp_mat[3];
 }
 
 Mat WebP::hPredict(int block_num, int block_size, Mat channel_mat) {
@@ -426,11 +474,10 @@ Mat WebP::tmPredict(int block_num, int block_size, Mat channel_mat) {
 Mat WebP::dct(int block_num, int channel) {
     Mat residual_mat, result_mat;
     residual_mat = predictiveCoding(block_num, channel);
-    residual_mat.convertTo(residual_mat, CV_32F);
-    cv::dct(residual_mat, result_mat);
+    result_mat = mydct(residual_mat);
     //cout<<residual_mat<<endl;
     //cout<<result_mat<<endl;
-    result_mat.convertTo(result_mat, CV_16S);
+    //result_mat.convertTo(result_mat, CV_16S);
     result_mat = result_mat / (channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
     return result_mat;
 }
@@ -496,9 +543,11 @@ Mat WebP::indct(int block_num, int channel) {
     }
     zigzag_mat = channel_mat(Range(block_num, block_num + 1), Range(0, block_size * block_size)).clone();
     Mat indct_mat = inzigzag(zigzag_mat);
-    indct_mat = indct_mat.mul(channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
     indct_mat.convertTo(indct_mat, CV_32F);
-    idct(indct_mat, residual_mat);
+    indct_mat = indct_mat.mul(channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
+    residual_mat = myidct(indct_mat);
+    reconstruct_block_mat = residual_mat;
+    //reconstruct_block_mat.convertTo(reconstruct_block_mat, CV_16S);
     reconstruct_block_mat = inpredictCoding(block_num, block_size, channel, residual_mat);    
     Mat temp_mat = reconstruct_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size));
     reconstruct_block_mat.copyTo(temp_mat);
@@ -959,7 +1008,7 @@ void WebP::writeArithmeticCode() {
 void WebP::writeRunLengthCode() {
     int block_num = block_cols * block_rows;
     short num_s;
-    char num_c;
+    unsigned char num_uc;
 
     lenBeforeArith_Y = vec_DAR_Y.size();
     lenBeforeArith_U = vec_DAR_U.size();
@@ -974,10 +1023,10 @@ void WebP::writeRunLengthCode() {
             num_s = (short)vec_DAR_Y.at(i);
             outfile.write((char *)&num_s, sizeof(short));
         } else {
-            num_c = (char)vec_DAR_Y.at(i);
-            outfile.write(&num_c, sizeof(char));
-            //num_s = (short)vec_DAR_Y.at(i);
-            //outfile.write((char *)&num_s, sizeof(short));
+            num_uc = (unsigned char)vec_DAR_Y.at(i);
+            outfile.write((char *)&num_uc, sizeof(unsigned char));
+            num_s = (short)vec_DAR_Y.at(++i);
+            outfile.write((char *)&num_s, sizeof(short));
         }
     }
     for (int i = 0; i < lenBeforeArith_U; i++) {
@@ -985,10 +1034,10 @@ void WebP::writeRunLengthCode() {
             num_s = (short)vec_DAR_U.at(i);
             outfile.write((char *)&num_s, sizeof(short));
         } else {
-            num_c = (char)vec_DAR_U.at(i);
-            outfile.write(&num_c, sizeof(char));
-            //num_s = (short)vec_DAR_U.at(i);
-            //outfile.write((char *)&num_s, sizeof(short));
+            num_uc = (unsigned char)vec_DAR_U.at(i);
+            outfile.write((char *)&num_uc, sizeof(unsigned char));
+            num_s = (short)vec_DAR_U.at(++i);
+            outfile.write((char *)&num_s, sizeof(short));
         }
     }
     for (int i = 0; i < lenBeforeArith_V; i++) {
@@ -996,10 +1045,10 @@ void WebP::writeRunLengthCode() {
             num_s = (short)vec_DAR_V.at(i);
             outfile.write((char *)&num_s, sizeof(short));
         } else {
-            num_c = (char)vec_DAR_V.at(i);
-            outfile.write(&num_c, sizeof(char));
-            //num_s = (short)vec_DAR_V.at(i);
-            //outfile.write((char *)&num_s, sizeof(short));
+            num_uc = (unsigned char)vec_DAR_V.at(i);
+            outfile.write((char *)&num_uc, sizeof(unsigned char));
+            num_s = (short)vec_DAR_V.at(++i);
+            outfile.write((char *)&num_s, sizeof(short));
         }
     }
     
@@ -1041,7 +1090,7 @@ void WebP::readArithmeticCode() {
 void WebP::readRunLengthCode() {
     int block_num = block_cols * block_rows;
     short num_s;
-    char num_c;
+    unsigned char num_uc;
 
     infile.read((char *)&lenBeforeArith_Y, sizeof(int));
     infile.read((char *)&lenBeforeArith_U, sizeof(int));
@@ -1052,11 +1101,11 @@ void WebP::readRunLengthCode() {
             infile.read((char *)&num_s, sizeof(short));
             ivec_DAR_Y.push_back(num_s);
         } else {
-            infile.read(&num_c, sizeof(char));
-            ivec_DAR_Y.push_back((short)num_c);
-            //i ++;
-            //infile.read((char *)&num_s, sizeof(short));
-            //ivec_DAR_Y.push_back((short)num_s);
+            infile.read((char *)&num_uc, sizeof(unsigned char));
+            ivec_DAR_Y.push_back((short)num_uc);
+            i ++;
+            infile.read((char *)&num_s, sizeof(short));
+            ivec_DAR_Y.push_back((short)num_s);
         }
     }
     for (int i = 0; i < lenBeforeArith_U; i++) {
@@ -1064,11 +1113,11 @@ void WebP::readRunLengthCode() {
             infile.read((char *)&num_s, sizeof(short));
             ivec_DAR_U.push_back(num_s);
         } else {
-            infile.read(&num_c, sizeof(char));
-            ivec_DAR_U.push_back((short)num_c);
-            //i ++;
-            //infile.read((char *)&num_s, sizeof(short));
-            //ivec_DAR_U.push_back((short)num_s);
+            infile.read((char *)&num_uc, sizeof(unsigned char));
+            ivec_DAR_U.push_back((short)num_uc);
+            i ++;
+            infile.read((char *)&num_s, sizeof(short));
+            ivec_DAR_U.push_back((short)num_s);
         }
     }
     for (int i = 0; i < lenBeforeArith_V; i++) {
@@ -1076,11 +1125,83 @@ void WebP::readRunLengthCode() {
             infile.read((char *)&num_s, sizeof(short));
             ivec_DAR_V.push_back(num_s);
         } else {
-            infile.read(&num_c, sizeof(char));
-            ivec_DAR_V.push_back((short)num_c);
-            //i ++;
-            //infile.read((char *)&num_s, sizeof(short));
-            //ivec_DAR_V.push_back((short)num_s);
+            infile.read((char *)&num_uc, sizeof(unsigned char));
+            ivec_DAR_V.push_back((short)num_uc);
+            i ++;
+            infile.read((char *)&num_s, sizeof(short));
+            ivec_DAR_V.push_back((short)num_s);
         }
     }
 }
+
+
+void WebP::initDctMat() {
+
+    float dct_arr_8[8][8] = {
+        0.35355338, 0.35355338, 0.35355338, 0.35355338, 0.35355338, 0.35355338, 0.35355338, 0.35355338, 
+        0.49039263, 0.4157348, 0.27778512, 0.097545162, -0.097545162, -0.27778512, -0.4157348, -0.49039263, 
+        0.46193975, 0.19134171, -0.19134171, -0.46193975, -0.46193975, -0.19134171, 0.19134171, 0.46193975, 
+        0.4157348, -0.097545162, -0.49039263, -0.27778512, 0.27778512, 0.49039263, 0.097545162, -0.4157348, 
+        0.35355338, -0.35355338, -0.35355338, 0.35355338, 0.35355338, -0.35355338, -0.35355338, 0.35355338, 
+        0.27778512, -0.49039263, 0.097545162, 0.4157348, -0.4157348, -0.097545162, 0.49039263, -0.27778512, 
+        0.19134171, -0.46193975, 0.46193975, -0.19134171, -0.19134171, 0.46193975, -0.46193975, 0.19134171, 
+        0.097545162, -0.27778512, 0.4157348, -0.49039263, 0.49039263, -0.4157348, 0.27778512, -0.097545162
+    };
+
+    float dct_arr_16[16][16] = {
+        0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+        0.35185093, 0.33832949, 0.31180626, 0.27330047, 0.22429189, 0.16666391, 0.10263113, 0.034654293, -0.034654293, -0.10263113, -0.16666391, -0.22429189, -0.27330047, -0.31180626, -0.33832949, -0.35185093, 
+        0.34675995, 0.29396889, 0.19642374, 0.068974845, -0.068974845, -0.19642374, -0.29396889, -0.34675995, -0.34675995, -0.29396889, -0.19642374, -0.068974845, 0.068974845, 0.19642374, 0.29396889, 0.34675995, 
+        0.33832949, 0.22429189, 0.034654293, -0.16666391, -0.31180626, -0.35185093, -0.27330047, -0.10263113, 0.10263113, 0.27330047, 0.35185093, 0.31180626, 0.16666391, -0.034654293, -0.22429189, -0.33832949, 
+        0.32664073, 0.13529903, -0.13529903, -0.32664073, -0.32664073, -0.13529903, 0.13529903, 0.32664073, 0.32664073, 0.13529903, -0.13529903, -0.32664073, -0.32664073, -0.13529903, 0.13529903, 0.32664073, 
+        0.31180626, 0.034654293, -0.27330047, -0.33832949, -0.10263113, 0.22429189, 0.35185093, 0.16666391, -0.16666391, -0.35185093, -0.22429189, 0.10263113, 0.33832949, 0.27330047, -0.034654293, -0.31180626, 
+        0.29396889, -0.068974845, -0.34675995, -0.19642374, 0.19642374, 0.34675995, 0.068974845, -0.29396889, -0.29396889, 0.068974845, 0.34675995, 0.19642374, -0.19642374, -0.34675995, -0.068974845, 0.29396889, 
+        0.27330047, -0.16666391, -0.33832949, 0.034654293, 0.35185093, 0.10263113, -0.31180626, -0.22429189, 0.22429189, 0.31180626, -0.10263113, -0.35185093, -0.034654293, 0.33832949, 0.16666391, -0.27330047, 
+        0.25, -0.25, -0.25, 0.25, 0.25, -0.25, -0.25, 0.25, 0.25, -0.25, -0.25, 0.25, 0.25, -0.25, -0.25, 0.25,
+        0.22429189, -0.31180626, -0.10263113, 0.35185093, -0.034654293, -0.33832949, 0.16666391, 0.27330047, -0.27330047, -0.16666391, 0.33832949, 0.034654293, -0.35185093, 0.10263113, 0.31180626, -0.22429189, 
+        0.19642374, -0.34675995, 0.068974845, 0.29396889, -0.29396889, -0.068974845, 0.34675995, -0.19642374, -0.19642374, 0.34675995, -0.068974845, -0.29396889, 0.29396889, 0.068974845, -0.34675995, 0.19642374, 
+        0.16666391, -0.35185093, 0.22429189, 0.10263113, -0.33832949, 0.27330047, 0.034654293, -0.31180626, 0.31180626, -0.034654293, -0.27330047, 0.33832949, -0.10263113, -0.22429189, 0.35185093, -0.16666391, 
+        0.13529903, -0.32664073, 0.32664073, -0.13529903, -0.13529903, 0.32664073, -0.32664073, 0.13529903, 0.13529903, -0.32664073, 0.32664073, -0.13529903, -0.13529903, 0.32664073, -0.32664073, 0.13529903, 
+        0.10263113, -0.27330047, 0.35185093, -0.31180626, 0.16666391, 0.034654293, -0.22429189, 0.33832949, -0.33832949, 0.22429189, -0.034654293, -0.16666391, 0.31180626, -0.35185093, 0.27330047, -0.10263113, 
+        0.068974845, -0.19642374, 0.29396889, -0.34675995, 0.34675995, -0.29396889, 0.19642374, -0.068974845, -0.068974845, 0.19642374, -0.29396889, 0.34675995, -0.34675995, 0.29396889, -0.19642374, 0.068974845, 
+        0.034654293, -0.10263113, 0.16666391, -0.22429189, 0.27330047, -0.31180626, 0.33832949, -0.35185093, 0.35185093, -0.33832949, 0.31180626, -0.27330047, 0.22429189, -0.16666391, 0.10263113, -0.03465429, 
+    };
+
+    dct_mat_16 = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, dct_arr_16).clone();
+    dct_mat_8 = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F, dct_arr_8).clone();
+    dct_mat_16_T = dct_mat_16.t();
+    dct_mat_8_T = dct_mat_8.t();
+}
+
+Mat WebP::mydct(Mat input_mat) {
+
+    Mat dct_mat, dct_mat_T;
+    if (input_mat.cols == 16 && input_mat.rows == 16) {
+        dct_mat = dct_mat_16;
+        dct_mat_T = dct_mat_16_T;
+    } else if(input_mat.cols == 8 && input_mat.rows == 8) {
+        dct_mat = dct_mat_8;
+        dct_mat_T = dct_mat_8_T;
+    } else {
+        cout<<"[ERROR]: dct wrong input, the size of input is wrong!"<<endl;
+    }
+    input_mat.convertTo(input_mat, CV_32F);
+    return dct_mat * input_mat * dct_mat_T;
+}
+
+Mat WebP::myidct(Mat input_mat) {    
+    Mat dct_mat, dct_mat_T;
+    if (input_mat.cols == 16 && input_mat.rows == 16) {
+        dct_mat = dct_mat_16;
+        dct_mat_T = dct_mat_16_T;
+    } else if(input_mat.cols == 8 && input_mat.rows == 8) {
+        dct_mat = dct_mat_8;
+        dct_mat_T = dct_mat_8_T;
+    } else {
+        cout<<"[ERROR]: dct wrong input, the size of input is wrong!"<<endl;
+    }
+    input_mat.convertTo(input_mat, CV_32F);
+    return dct_mat_T * input_mat * dct_mat;
+}
+
+

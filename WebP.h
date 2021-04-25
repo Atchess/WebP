@@ -34,6 +34,7 @@ private:
     Mat Y, U, V;
     Mat img_origin, img_16base;
     Mat dct_Y, dct_U, dct_V;
+    Mat dct_mat_16, dct_mat_8, dct_mat_16_T, dct_mat_8_T;
 
     Mat img_reconstruct, img_reconstruct_16base;
     Mat quantizationTable_Y, quantizationTable_UV;
@@ -53,6 +54,11 @@ private:
     double res_Y, res_U, res_V;
 
     vector<short> ivec_DAR_Y, ivec_DAR_U, ivec_DAR_V;
+
+    // dct
+    void initDctMat();
+    Mat mydct(Mat input_mat);
+    Mat myidct(Mat input_mat);
 
     // compress
     void imagePretreatment(String path);

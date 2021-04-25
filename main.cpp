@@ -1,7 +1,7 @@
 #include "WebP.h"
 
 int main() {
-    WebP webp("0.jpg");
+    WebP webp("11.png");
     waitKey();
     return 0;
 }
