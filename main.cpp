@@ -1,7 +1,8 @@
 #include "WebP.h"
 
 int main() {
-    WebP webp("11.png");
+    WebP webp;
+    webp.Start();
     waitKey();
     return 0;
 }

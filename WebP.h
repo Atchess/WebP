@@ -37,10 +37,10 @@ private:
     Mat dct_mat_16, dct_mat_8, dct_mat_16_T, dct_mat_8_T;
 
     Mat img_reconstruct, img_reconstruct_16base;
-    Mat quantizationTable_Y, quantizationTable_UV;
+    Mat quantizationTable_Y, quantizationTable_UV, quantizationTable_Y_dc, quantizationTable_UV_dc;
     Mat idct_Y, idct_U, idct_V;
     Mat Y_reconstruct, U_reconstruct, V_reconstruct; 
-    unsigned int block_rows, block_cols, height, width;
+    unsigned int block_rows, block_cols, height, width, _pre_type;
     vector<unsigned int> predict_type;
     vector<unsigned int> reconstruct_type;
 
@@ -61,7 +61,7 @@ private:
     Mat myidct(Mat input_mat);
 
     // compress
-    void imagePretreatment(String path);
+    void imagePretreatment();
     void compress();
     void subSampling();
     void initQuantizationTable();
@@ -84,7 +84,7 @@ private:
     Mat indcPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
     Mat intmPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat);
     Mat reconstructImage();
-    void uncompress();
+    void decompress();
 
     void test();
 
@@ -113,6 +113,9 @@ private:
 public:
     WebP();
     WebP(String path);
+    void Compress();
+    void DeCompress();
+    void Start();
     ~WebP();
 }; 
 

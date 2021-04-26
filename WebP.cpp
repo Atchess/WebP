@@ -1,43 +1,111 @@
 #include "WebP.h"
 
-WebP::WebP(String path) {
-    this->path = path;
+WebP::WebP() {
     initQuantizationTable();
     initDctMat();
-    //test();
+}
+
+WebP::~WebP() {
+
+}
+
+
+WebP::WebP(String path) {
+    this->path = path;
+    filename = "test.bin";
+    initQuantizationTable();
+    initDctMat();
+}
+
+void WebP::Start() {
+    int operation;
+    cout<<"Please enter what needs to be done: "<<endl;
+    cout<<"1: compress"<<endl;
+    cout<<"2: decompress"<<endl;
+    cout<<"3: exit program"<<endl;
+    cout<<"Your input: ";
+    cin>>operation;
+    if (operation == 1) {
+        Compress();
+    } 
+    if (operation == 2) {
+        DeCompress();
+    } 
+    if (operation == 3) {
+        return;
+    } 
+}
+
+void WebP::Compress() {
+    cout<<"Enter the name of the image to be compressed: ";
+    cin>>path;
+    if (path.empty()) {
+        cout<<"File name cannot be empty!"<<endl;
+        cout<<"Press any key to end."<<endl;
+        waitKey();
+        return;
+    }
+    cout<<"Enter the name of the file stored compressed data: ";
+    cin>>filename;
+    if (filename.empty()) {
+        cout<<"File name cannot be empty!"<<endl;
+        cout<<"Press any key to end."<<endl;
+        waitKey();
+        return;
+    }
+    cout<<"Input predictive coding method: "<<endl;
+    cout<<"0: col predictive coding: "<<endl;
+    cout<<"1: row predictive coding: "<<endl;
+    cout<<"2: dc predictive coding: "<<endl;
+    cout<<"3: tm predictive coding: "<<endl;
+    cout<<"other positive integer: mixing predictive coding"<<endl;
+    cin>>_pre_type;
     compress();
-    writeData();
-    uncompress();
-    imshow("test", img_reconstruct);
-    imwrite("p1.bmp", img_reconstruct);
-    Mat test = U_reconstruct;
-    test.convertTo(test, CV_8U);
-    imshow("dd", test);
-    test = Y_reconstruct;
-    test.convertTo(test, CV_8U);
-    imshow("ddY", test);
+    cout<<"Compression is complete."<<endl;
+}
+void WebP::DeCompress() {
+    String decompress_filename;
+    cout<<"Enter the name of the file to be decompressed: ";
+    cin>>filename;
+    if (filename.empty()) {
+        cout<<"File name cannot be empty!"<<endl;
+        cout<<"Press any key to end."<<endl;
+        waitKey();
+        return;
+    }
+    cout<<"Enter the decompressed file name: ";
+    cin>>decompress_filename;
+    decompress();
+    imshow("decompress", img_reconstruct);
+    if (!decompress_filename.empty()) {
+        imwrite(decompress_filename.append(".bmp"), img_reconstruct);
+    } else {
+        imwrite("decompress.bmp", img_reconstruct);
+    }
+    cout<<"Press any key to end."<<endl;
     waitKey();
+    destroyAllWindows();
 }
 
 void WebP::initQuantizationTable() {
-    //float quan_Y[16][16] = {7, 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-    //                        , 7, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17
-    //                        , 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18
-    //                        , 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20
-    //                        , 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22
-    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24
-    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26
-    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28
-    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30
-    //                        , 1, 1, 1, 1, 1, 1, 1, 1, 18, 20, 22, 24, 26, 28, 30, 33
-    //                        , 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36
-    //                        , 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39
-    //                        , 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42
-    //                        , 1, 1, 1, 17, 18, 20, 2, 24, 26, 28, 30, 33, 36, 39, 42, 45
-    //                        , 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49
-    //                        , 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49, 52};
-    float quan_UV[8][8] = { 4, 1.5, 1, 1, 1, 1, 1, 1
-                            , 1.5, 1, 1, 1, 1, 1, 1, 14
+    float quan_Y[16][16] = {8, 8, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+                            , 8, 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17
+                            , 7, 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18
+                            , 7, 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20
+                            , 7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28
+                            , 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30
+                            , 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33
+                            , 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36
+                            , 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39
+                            , 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42
+                            , 1, 1, 1, 17, 18, 20, 2, 24, 26, 28, 30, 33, 36, 39, 42, 45
+                            , 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49
+                            , 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49, 52};
+    float quan_UV[8][8] = { 4, 1, 1, 1, 1, 1, 1, 1
+                            , 1, 1, 1, 1, 1, 1, 1, 14
                             , 1, 1, 1, 1, 1, 1, 14, 15
                             , 1, 1, 1, 1, 1, 14, 15, 16
                             , 1, 1, 1, 1, 14, 15, 16, 18
@@ -45,175 +113,15 @@ void WebP::initQuantizationTable() {
                             , 1, 1, 14, 15, 16, 18, 20, 22
                             , 1, 14, 15, 16, 18, 20, 22, 23
                             };
-    float quan_Y[16][16] = { 8, 2, 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-                            , 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17
-                            , 1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18
-                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20
-                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22
-                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24
-                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26
-                            , 1, 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28
-                            , 1, 1, 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30
-                            , 1, 1, 1, 1, 1, 1, 1, 1, 18, 20, 22, 24, 26, 28, 30, 33
-                            , 1, 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36
-                            , 1, 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39
-                            , 1, 1, 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42
-                            , 1, 1, 1, 17, 18, 20, 2, 24, 26, 28, 30, 33, 36, 39, 42, 45
-                            , 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49
-                            , 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49, 52};
-    //float quan_UV[8][8] = { 8, 8, 8, 9, 1, 1, 1, 1
-    //                        , 8, 8, 9, 1, 1, 1, 1, 14
-    //                        , 8, 9, 1, 1, 1, 1, 14, 15
-    //                        , 9, 1, 1, 1, 1, 14, 15, 16
-    //                        , 1, 1, 1, 1, 14, 15, 16, 18
-    //                        , 1, 1, 1, 14, 15, 16, 18, 20
-    //                        , 1, 1, 14, 15, 16, 18, 20, 22
-    //                        , 1, 14, 15, 16, 18, 20, 22, 23
-    //                        };
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            if (quan_UV[i][j] == 1) {
-                quan_UV[i][j] = 0.1;
-            } else {
-                quan_UV[i][j] = 1;
-            }
-        }
-    }
-//
-    for (int i = 0; i < 16; i++) {
-        for (int j = 0; j < 16; j++) {
-            if (quan_Y[i][j] == 1) {
-                quan_Y[i][j] = 0.1;
-            } else {
-                quan_Y[i][j] = 1;
-            }
-        }
-    }
-    quantizationTable_Y = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, quan_Y).clone();
-    quantizationTable_UV = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F, quan_UV).clone();
-    //quantizationTable_Y = Mat::ones(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F) / 10.0;
-    //quantizationTable_UV = Mat::ones(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F) / 10.0;
-    //quantizationTable_Y.at<float>(0, 0) = 8;
-    //quantizationTable_Y.at<float>(0, 1) = 4;
-    //quantizationTable_Y.at<float>(1, 0) = 4;
-    //quantizationTable_Y.at<float>(1, 1) = 2;
-    //quantizationTable_UV.at<float>(0, 0) = 4;
-}
-
-void WebP::test() {
-    imagePretreatment(path);
-    predict_type.clear();
-    subSampling();
-    int block_num;
-    Mat temp0, temp1, temp2;
-    Mat y_pre, u_pre, v_pre;
-    y_pre = Y.clone();
-    u_pre = U.clone();
-    v_pre = V.clone();
-
-    Y_reconstruct.create(Y.rows, Y.cols, CV_16S);
-    U_reconstruct.create(U.rows, U.cols, CV_16S);
-    V_reconstruct.create(V.rows, V.cols, CV_16S);
-
-    for (int i = 0; i < block_rows; i ++) {
-        for (int j = 0; j < block_cols; j ++) {
-            block_num = i * block_cols + j;
-            temp0 = predictiveCoding(block_num, Y_CHANNEL);
-            temp1 = predictiveCoding(block_num, U_CHANNEL);
-            temp2 = predictiveCoding(block_num, V_CHANNEL);
-
-            temp0.convertTo(temp0, CV_32F);
-            temp1.convertTo(temp1, CV_32F);
-            temp2.convertTo(temp2, CV_32F);
-
-            cv::dct(temp0, temp0);
-            cv::dct(temp1, temp1);
-            cv::dct(temp2, temp2);
-
-            //cout<<temp0<<endl;
-
-            //temp0.convertTo(temp0, CV_16S);
-            //temp1.convertTo(temp1, CV_16S);
-            //temp2.convertTo(temp2, CV_16S);
-
-            temp0 = zigzag(temp0);
-            temp1 = zigzag(temp1);
-            temp2 = zigzag(temp2);
-//
-            temp0 = inzigzag(temp0);
-            temp1 = inzigzag(temp1);
-            temp2 = inzigzag(temp2);
-
-
-            temp0.convertTo(temp0, CV_32F);
-            temp1.convertTo(temp1, CV_32F);
-            temp2.convertTo(temp2, CV_32F);
-
-            //cout<<temp0<<endl;
-
-            cv::idct(temp0, temp0);
-            cv::idct(temp1, temp1);            
-            cv::idct(temp2, temp2);
-
-            temp0.convertTo(temp0, CV_16S);
-            temp1.convertTo(temp1, CV_16S);
-            temp2.convertTo(temp2, CV_16S);
-
-            temp0.copyTo(y_pre(Range(i * MACROBLOCKSIZE, (i + 1) * MACROBLOCKSIZE), Range(j * MACROBLOCKSIZE, (j + 1) * MACROBLOCKSIZE)));
-            temp1.copyTo(u_pre(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-            temp2.copyTo(v_pre(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-
-        }
-    }
-    reconstruct_type.assign(predict_type.begin(), predict_type.end());
-    for (int i = 0; i < block_rows; i ++) {
-        for (int j = 0; j < block_cols; j ++) {
-            block_num = i * block_cols + j;
-            try
-            {
-            temp0 = inpredictCoding(block_num, MACROBLOCKSIZE, Y_CHANNEL, y_pre(Range(i * MACROBLOCKSIZE, (i + 1) * MACROBLOCKSIZE), Range(j * MACROBLOCKSIZE, (j + 1) * MACROBLOCKSIZE)));
-            temp1 = inpredictCoding(block_num, MACROBLOCKSIZE / 2, U_CHANNEL, u_pre(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-            temp2 = inpredictCoding(block_num, MACROBLOCKSIZE / 2, V_CHANNEL, v_pre(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-            }
-            catch(const std::exception& e)
-            {
-                std::cerr << e.what() << '\n';
-            }
-            
-            temp0.copyTo(Y_reconstruct(Range(i * MACROBLOCKSIZE, (i + 1) * MACROBLOCKSIZE), Range(j * MACROBLOCKSIZE, (j + 1) * MACROBLOCKSIZE)));
-            temp1.copyTo(U_reconstruct(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-            temp2.copyTo(V_reconstruct(Range(i * MACROBLOCKSIZE / 2, (i + 1) * MACROBLOCKSIZE / 2), Range(j * MACROBLOCKSIZE / 2, (j + 1) * MACROBLOCKSIZE / 2)));
-
-        }
-    }
-    Mat YUVn;
-    YUVn.create(Y.rows, Y.cols, CV_16SC3);
-    for (int i = 0; i < YUVn.rows; i++) {
-        for (int j = 0; j < YUVn.cols; j++) {
-            YUVn.at<Vec3s>(i, j)[0] = Y_reconstruct.at<short>(i, j);
-            YUVn.at<Vec3s>(i, j)[1] = U_reconstruct.at<short>(i / 2, j / 2);
-            YUVn.at<Vec3s>(i, j)[2] = V_reconstruct.at<short>(i / 2, j / 2);
-        }
-    }
-    YUVn.convertTo(temp0, CV_8UC3);
-    Mat test;
-    cvtColor(temp0, test, COLOR_YUV2BGR);
-    imshow("drrd", test);
-    Y_reconstruct.convertTo(temp0, CV_8U);
-    imshow("dd", temp0);
-    V_reconstruct.convertTo(temp0, CV_8U);
-    imshow("ddf", temp0);
-    U_reconstruct.convertTo(temp0, CV_8U);
-    imshow("drd", temp0);
-    waitKey();
-}
-
-WebP::~WebP() {
-
+    quantizationTable_Y_dc = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, quan_Y).clone() * 4;
+    quantizationTable_UV_dc = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F, quan_UV).clone();
+    quantizationTable_Y = Mat::ones(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F);
+    quantizationTable_UV = Mat::ones(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F) ;
 }
 
 void WebP::compress() {
-    imagePretreatment(path);
+    predict_type.clear();
+    imagePretreatment();
     subSampling();
     dct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
     dct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
@@ -247,6 +155,7 @@ void WebP::compress() {
     
     DPCMAndRimCoding();
     //arithmeticCoding();
+    writeData();
 }
 
 // the function is so bad, but i don't want to rewrite it. 
@@ -277,8 +186,12 @@ Mat WebP::zigzag(Mat input) {
     return zigMat;
 }
 
-void WebP::imagePretreatment(String path) {
+void WebP::imagePretreatment() {
     img_origin = imread(path);
+    if(!img_origin.data) {  
+        cout<<"Can not read this image !"<<endl;  
+        exit(-1);  
+    }  
     Mat img_YUV, img_temp0, img_temp1, img_temp2;
     int cols, rows;
     cvtColor(img_origin, img_YUV, COLOR_RGB2YCrCb);
@@ -290,9 +203,6 @@ void WebP::imagePretreatment(String path) {
     img_temp1 = img_YUV(Rect(0, 0, img_YUV.cols, img_YUV.rows));
     img_temp2 = img_16base(Range(0, img_YUV.rows), Range(0, img_YUV.cols));
     img_temp1.copyTo(img_temp2);
-    // Mat test = Mat::zeros(img_16base.cols / 2, img_16base.rows / 2, img_YUV.type());
-    // resize(img_16base, test, Size(img_16base.cols / 2, img_16base.rows / 2));
-    // imshow("test1", test);
     if (img_YUV.cols % MACROBLOCKSIZE != 0) {
         int patch = MACROBLOCKSIZE - img_YUV.cols % MACROBLOCKSIZE;
         img_temp1 = img_YUV(Range(0, img_YUV.rows), Range(img_YUV.cols - 1, img_YUV.cols));
@@ -353,7 +263,26 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
             exit(-1);
             break;
     }
-
+    if (_pre_type == 0) {
+        temp_mat[0] = hPredict(block_num, block_size, channel_mat); 
+        predict_type.push_back(0);
+        return temp_mat[0];
+    }
+    if (_pre_type == 1) {
+        temp_mat[1] = vPredict(block_num, block_size, channel_mat); 
+        predict_type.push_back(1);
+        return temp_mat[1];
+    }
+    if (_pre_type == 2) {
+        temp_mat[2] = dcPredict(block_num, block_size, channel_mat); 
+        predict_type.push_back(2);
+        return temp_mat[2];
+    }
+    if (_pre_type == 3) {
+        temp_mat[3] = tmPredict(block_num, block_size, channel_mat); 
+        predict_type.push_back(3);
+        return temp_mat[3];
+    }
     temp_mat[0] = hPredict(block_num, block_size, channel_mat);
     temp_mat[1] = vPredict(block_num, block_size, channel_mat);
     temp_mat[2] = dcPredict(block_num, block_size, channel_mat);     
@@ -367,8 +296,8 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
         }
     }
     // add forecast method type to vector 
-    predict_type.push_back(3);
-    return temp_mat[3];
+    predict_type.push_back(index);
+    return temp_mat[index];
 }
 
 Mat WebP::hPredict(int block_num, int block_size, Mat channel_mat) {
@@ -386,9 +315,6 @@ Mat WebP::hPredict(int block_num, int block_size, Mat channel_mat) {
         temp0.copyTo(temp1);
     }
     subtract(origin_mat, predict_mat, residual_mat);
-    //cout<<origin_mat<<endl;
-    //cout<<predict_mat<<endl;
-    //cout<<residual_mat<<endl;
     return residual_mat;
 }
 
@@ -472,13 +398,15 @@ Mat WebP::tmPredict(int block_num, int block_size, Mat channel_mat) {
 }
 
 Mat WebP::dct(int block_num, int channel) {
-    Mat residual_mat, result_mat;
+    Mat residual_mat, result_mat, quan_mat;
     residual_mat = predictiveCoding(block_num, channel);
     result_mat = mydct(residual_mat);
-    //cout<<residual_mat<<endl;
-    //cout<<result_mat<<endl;
-    //result_mat.convertTo(result_mat, CV_16S);
-    result_mat = result_mat / (channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
+    if (predict_type[block_num * 3 + channel] == 2) {
+        quan_mat = (channel == Y_CHANNEL ? quantizationTable_Y_dc : quantizationTable_UV_dc);
+    } else {
+        quan_mat = (channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
+    }
+    result_mat = result_mat / quan_mat;
     return result_mat;
 }
 int WebP::residualLength(Mat mat) {
@@ -520,7 +448,7 @@ Mat WebP::indct(int block_num, int channel) {
     int block_row = block_num / block_cols;
     int block_col = block_num % block_cols;
     int block_size = MACROBLOCKSIZE;
-    Mat channel_mat, zigzag_mat, residual_mat, reconstruct_mat, reconstruct_block_mat;
+    Mat channel_mat, zigzag_mat, residual_mat, reconstruct_mat, reconstruct_block_mat, quan_mat;
     switch (channel) {
         case Y_CHANNEL:
             channel_mat = idct_Y;
@@ -544,10 +472,14 @@ Mat WebP::indct(int block_num, int channel) {
     zigzag_mat = channel_mat(Range(block_num, block_num + 1), Range(0, block_size * block_size)).clone();
     Mat indct_mat = inzigzag(zigzag_mat);
     indct_mat.convertTo(indct_mat, CV_32F);
-    indct_mat = indct_mat.mul(channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
+    if (reconstruct_type[block_num * 3 + channel] == 2) {
+        quan_mat = (channel == Y_CHANNEL ? quantizationTable_Y_dc : quantizationTable_UV_dc);
+    } else {
+        quan_mat = (channel == Y_CHANNEL ? quantizationTable_Y : quantizationTable_UV);
+    }
+    indct_mat = indct_mat.mul(quan_mat);
     residual_mat = myidct(indct_mat);
     reconstruct_block_mat = residual_mat;
-    //reconstruct_block_mat.convertTo(reconstruct_block_mat, CV_16S);
     reconstruct_block_mat = inpredictCoding(block_num, block_size, channel, residual_mat);    
     Mat temp_mat = reconstruct_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size));
     reconstruct_block_mat.copyTo(temp_mat);
@@ -573,13 +505,7 @@ Mat WebP::inpredictCoding(int block_num, int block_size, int channel, Mat residu
     }
     switch (type) {
         case H_PRED :
-            try {
             reconstruct_mat = inhPredict(block_num, block_size, channel_mat, residual_mat);
-            }
-            catch(const std::exception& e)
-            {
-                std::cerr << e.what() << '\n';
-            }
             break;
         case V_PRED :
             reconstruct_mat = invPredict(block_num, block_size, channel_mat, residual_mat);
@@ -628,8 +554,8 @@ Mat WebP::reconstructImage() {
     (img_reconstruct_16base(Range(0, height), Range(0, width))).copyTo(img_reconstruct);
     return YUV_reconstruct;
 }
-void WebP::uncompress() {
-
+void WebP::decompress() {
+    reconstruct_type.clear();
     idct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
     idct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
     idct_V.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
@@ -950,7 +876,6 @@ void WebP::deArithmeticCoding() {
 }
 
 void WebP::writeData() {
-    filename = "test.bin";
     outfile.open(filename, ios::binary);
     unsigned short h = height;
     unsigned short w = width;
@@ -958,31 +883,7 @@ void WebP::writeData() {
     outfile.write((char *)&w, sizeof(short));
     writeTypeData();
     writeRunLengthCode();
-    outfile.close();
-    //readData();
-    //for (int i = 0; i < predict_type.size(); i++) {
-    //    if (predict_type.at(i) != reconstruct_type.at(i)) {
-    //        cout <<"wrong"<<endl;
-    //    }
-    //}
-    //for (int i = 0; i < vec_DAR_Y.size(); i++) {
-    //    if (vec_DAR_Y.at(i) != ivec_DAR_Y.at(i)) {
-    //        cout<<i<<endl;
-    //        cout<<vec_DAR_Y.at(i)<<" "<<ivec_DAR_Y.at(i)<<endl;
-    //    }
-    //}
-    //for (int i = 0; i < vec_DAR_U.size(); i++) {
-    //    if (vec_DAR_U.at(i) != ivec_DAR_U.at(i)) {
-    //        cout<<i<<endl;
-    //    }
-    //}
-    //for (int i = 0; i < vec_DAR_V.size(); i++) {
-    //    if (vec_DAR_V.at(i) != ivec_DAR_V.at(i)) {
-    //        cout<<i<<endl;
-    //    }
-    //}
-    //cout<<"end"<<endl;
-    
+    outfile.close();    
     
 }
 
@@ -1017,7 +918,7 @@ void WebP::writeRunLengthCode() {
     outfile.write((char *)&lenBeforeArith_Y, sizeof(int));
     outfile.write((char *)&lenBeforeArith_U, sizeof(int));
     outfile.write((char *)&lenBeforeArith_V, sizeof(int));
-
+    int count = 0;
     for (int i = 0; i < lenBeforeArith_Y; i++) {
         if (i < block_num) {
             num_s = (short)vec_DAR_Y.at(i);
@@ -1027,6 +928,9 @@ void WebP::writeRunLengthCode() {
             outfile.write((char *)&num_uc, sizeof(unsigned char));
             num_s = (short)vec_DAR_Y.at(++i);
             outfile.write((char *)&num_s, sizeof(short));
+            if (num_s > 127 || num_s < -128) {
+                count ++;
+            }
         }
     }
     for (int i = 0; i < lenBeforeArith_U; i++) {
@@ -1038,6 +942,9 @@ void WebP::writeRunLengthCode() {
             outfile.write((char *)&num_uc, sizeof(unsigned char));
             num_s = (short)vec_DAR_U.at(++i);
             outfile.write((char *)&num_s, sizeof(short));
+            if (num_s > 127 || num_s < -128) {
+                count ++;
+            }
         }
     }
     for (int i = 0; i < lenBeforeArith_V; i++) {
@@ -1049,15 +956,22 @@ void WebP::writeRunLengthCode() {
             outfile.write((char *)&num_uc, sizeof(unsigned char));
             num_s = (short)vec_DAR_V.at(++i);
             outfile.write((char *)&num_s, sizeof(short));
+            if (num_s > 127 || num_s < -128) {
+                count ++;
+            }
         }
     }
+cout<<count<<endl;
     
 }
 
 
 void WebP::readData() {
-    filename = "test.bin";
     infile.open(filename, ios::binary);
+    if(!infile) {
+        cout <<"No such file,please check the file name!"<<endl;
+        exit(0);
+    }
     short h, w;
     infile.read((char *)&h, sizeof(short));
     infile.read((char *)&w, sizeof(short));
