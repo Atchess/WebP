@@ -60,7 +60,14 @@ void WebP::Compress() {
     cout<<"3: tm predictive coding: "<<endl;
     cout<<"other positive integer: mixing predictive coding"<<endl;
     cin>>_pre_type;
+    try
+    {
     compress();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
     cout<<"Compression is complete."<<endl;
 }
 void WebP::DeCompress() {
@@ -115,8 +122,10 @@ void WebP::initQuantizationTable() {
                             };
     quantizationTable_Y_dc = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, quan_Y).clone() * 4;
     quantizationTable_UV_dc = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F, quan_UV).clone();
-    quantizationTable_Y = Mat::ones(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F);
-    quantizationTable_UV = Mat::ones(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F) ;
+    //quantizationTable_Y = Mat::ones(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F);
+    //quantizationTable_UV = Mat::ones(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F) ;
+    quantizationTable_Y = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, quan_Y).clone() * 2;
+    quantizationTable_UV = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F, quan_UV).clone();    
 }
 
 void WebP::compress() {
@@ -126,6 +135,12 @@ void WebP::compress() {
     dct_Y.create( block_cols * block_rows, MACROBLOCKSIZE * MACROBLOCKSIZE, CV_16S);
     dct_U.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
     dct_V.create( block_cols * block_rows, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2, CV_16S);
+    idct_Y = dct_Y.clone();
+    idct_U = dct_U.clone();
+    idct_V = dct_V.clone();
+    Y_reconstruct = Y.clone();
+    U_reconstruct = U.clone();
+    V_reconstruct = V.clone();
     Mat dct_block_Y, dct_block_U, dct_block_V, mat_temp;
     Mat zig_block_Y, zig_block_U, zig_block_V;
     int block_num;
@@ -136,16 +151,25 @@ void WebP::compress() {
             zig_block_Y = zigzag(dct_block_Y);
             mat_temp = dct_Y(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE * MACROBLOCKSIZE));
             zig_block_Y.copyTo(mat_temp);    
-            
+            mat_temp = idct_Y(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE * MACROBLOCKSIZE));
+            zig_block_Y.copyTo(mat_temp); 
+            indct(block_num, Y_CHANNEL);
+
             dct_block_U = dct(block_num, U_CHANNEL);
             zig_block_U = zigzag(dct_block_U);
             mat_temp = dct_U(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2));
             zig_block_U.copyTo(mat_temp);
+            mat_temp = idct_U(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2));
+            zig_block_U.copyTo(mat_temp); 
+            indct(block_num, U_CHANNEL);
             
             dct_block_V = dct(block_num, V_CHANNEL);
             zig_block_V = zigzag(dct_block_V);
             mat_temp = dct_V(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2));
             zig_block_V.copyTo(mat_temp);
+            mat_temp = idct_V(Range(block_num, block_num + 1), Range(0, MACROBLOCKSIZE / 2 * MACROBLOCKSIZE / 2));
+            zig_block_V.copyTo(mat_temp); 
+            indct(block_num, V_CHANNEL);
         }
     }
     int hist[4] = {0};
@@ -248,14 +272,14 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
     Mat channel_mat;
     switch (channel) {
         case Y_CHANNEL:
-            channel_mat = Y;
+            channel_mat = Y_reconstruct;
             break;
         case U_CHANNEL:
-            channel_mat = U;
+            channel_mat = U_reconstruct;
             block_size /= 2; 
             break;
         case V_CHANNEL:
-            channel_mat = V;
+            channel_mat = V_reconstruct;
             block_size /= 2; 
             break;
         default:
@@ -266,21 +290,25 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
     if (_pre_type == 0) {
         temp_mat[0] = hPredict(block_num, block_size, channel_mat); 
         predict_type.push_back(0);
+        reconstruct_type.push_back(0);
         return temp_mat[0];
     }
     if (_pre_type == 1) {
         temp_mat[1] = vPredict(block_num, block_size, channel_mat); 
         predict_type.push_back(1);
+        reconstruct_type.push_back(1);
         return temp_mat[1];
     }
     if (_pre_type == 2) {
         temp_mat[2] = dcPredict(block_num, block_size, channel_mat); 
         predict_type.push_back(2);
+        reconstruct_type.push_back(2);
         return temp_mat[2];
     }
     if (_pre_type == 3) {
         temp_mat[3] = tmPredict(block_num, block_size, channel_mat); 
         predict_type.push_back(3);
+        reconstruct_type.push_back(3);
         return temp_mat[3];
     }
     temp_mat[0] = hPredict(block_num, block_size, channel_mat);
@@ -297,6 +325,7 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
     }
     // add forecast method type to vector 
     predict_type.push_back(index);
+    reconstruct_type.push_back(index);
     return temp_mat[index];
 }
 
