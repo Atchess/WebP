@@ -60,15 +60,9 @@ void WebP::Compress() {
     cout<<"3: tm predictive coding: "<<endl;
     cout<<"other positive integer: mixing predictive coding"<<endl;
     cin>>_pre_type;
-    try
-    {
     compress();
-    }
-    catch(const std::exception& e)
-    {
-        std::cerr << e.what() << '\n';
-    }
     cout<<"Compression is complete."<<endl;
+    getchar();
 }
 void WebP::DeCompress() {
     String decompress_filename;
@@ -91,7 +85,6 @@ void WebP::DeCompress() {
     }
     cout<<"Press any key to end."<<endl;
     waitKey();
-    destroyAllWindows();
 }
 
 void WebP::initQuantizationTable() {
@@ -111,9 +104,9 @@ void WebP::initQuantizationTable() {
                             , 1, 1, 1, 17, 18, 20, 2, 24, 26, 28, 30, 33, 36, 39, 42, 45
                             , 1, 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49
                             , 1, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 39, 42, 45, 49, 52};
-    float quan_UV[8][8] = { 4, 1, 1, 1, 1, 1, 1, 1
-                            , 1, 1, 1, 1, 1, 1, 1, 14
-                            , 1, 1, 1, 1, 1, 1, 14, 15
+    float quan_UV[8][8] = { 6, 5, 4, 1, 1, 1, 1, 1
+                            , 5, 4, 1, 1, 1, 1, 1, 14
+                            , 4, 1, 1, 1, 1, 1, 14, 15
                             , 1, 1, 1, 1, 1, 14, 15, 16
                             , 1, 1, 1, 1, 14, 15, 16, 18
                             , 1, 1, 1, 14, 15, 16, 18, 20
@@ -942,7 +935,15 @@ void WebP::writeRunLengthCode() {
             num_uc = (unsigned char)vec_DAR_Y.at(i);
             outfile.write((char *)&num_uc, sizeof(unsigned char));
             num_s = (short)vec_DAR_Y.at(++i);
-            outfile.write((char *)&num_s, sizeof(short));
+            //outfile.write((char *)&num_s, sizeof(short));
+            num_c = num_s;
+            if (num_s > 127) {
+                num_c = 127;
+            }
+            if (num_s < -128) {
+                num_c = -128;
+            }
+            outfile.write((char *)&num_c, sizeof(char));
             if (num_s > 127 || num_s < -128) {
                 count ++;
             }
@@ -956,7 +957,15 @@ void WebP::writeRunLengthCode() {
             num_uc = (unsigned char)vec_DAR_U.at(i);
             outfile.write((char *)&num_uc, sizeof(unsigned char));
             num_s = (short)vec_DAR_U.at(++i);
-            outfile.write((char *)&num_s, sizeof(short));
+            //outfile.write((char *)&num_s, sizeof(short));
+            num_c = num_s;
+            if (num_s > 127) {
+                num_c = 127;
+            }
+            if (num_s < -128) {
+                num_c = -128;
+            }
+            outfile.write((char *)&num_c, sizeof(char));
             if (num_s > 127 || num_s < -128) {
                 count ++;
             }
@@ -970,7 +979,15 @@ void WebP::writeRunLengthCode() {
             num_uc = (unsigned char)vec_DAR_V.at(i);
             outfile.write((char *)&num_uc, sizeof(unsigned char));
             num_s = (short)vec_DAR_V.at(++i);
-            outfile.write((char *)&num_s, sizeof(short));
+            //outfile.write((char *)&num_s, sizeof(short));
+            num_c = num_s;
+            if (num_s > 127) {
+                num_c = 127;
+            }
+            if (num_s < -128) {
+                num_c = -128;
+            }
+            outfile.write((char *)&num_c, sizeof(char));
             if (num_s > 127 || num_s < -128) {
                 count ++;
             }
@@ -1020,6 +1037,7 @@ void WebP::readRunLengthCode() {
     int block_num = block_cols * block_rows;
     short num_s;
     unsigned char num_uc;
+    char num_c;
 
     infile.read((char *)&lenBeforeArith_Y, sizeof(int));
     infile.read((char *)&lenBeforeArith_U, sizeof(int));
@@ -1033,8 +1051,8 @@ void WebP::readRunLengthCode() {
             infile.read((char *)&num_uc, sizeof(unsigned char));
             ivec_DAR_Y.push_back((short)num_uc);
             i ++;
-            infile.read((char *)&num_s, sizeof(short));
-            ivec_DAR_Y.push_back((short)num_s);
+            infile.read((char *)&num_c, sizeof(char));
+            ivec_DAR_Y.push_back((short)num_c);
         }
     }
     for (int i = 0; i < lenBeforeArith_U; i++) {
@@ -1045,8 +1063,8 @@ void WebP::readRunLengthCode() {
             infile.read((char *)&num_uc, sizeof(unsigned char));
             ivec_DAR_U.push_back((short)num_uc);
             i ++;
-            infile.read((char *)&num_s, sizeof(short));
-            ivec_DAR_U.push_back((short)num_s);
+            infile.read((char *)&num_c, sizeof(char));
+            ivec_DAR_U.push_back((short)num_c);
         }
     }
     for (int i = 0; i < lenBeforeArith_V; i++) {
@@ -1057,8 +1075,8 @@ void WebP::readRunLengthCode() {
             infile.read((char *)&num_uc, sizeof(unsigned char));
             ivec_DAR_V.push_back((short)num_uc);
             i ++;
-            infile.read((char *)&num_s, sizeof(short));
-            ivec_DAR_V.push_back((short)num_s);
+            infile.read((char *)&num_c, sizeof(char));
+            ivec_DAR_V.push_back((short)num_c);
         }
     }
 }
