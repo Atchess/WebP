@@ -122,9 +122,7 @@ void WebP::initQuantizationTable() {
                             };
     quantizationTable_Y_dc = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, quan_Y).clone() * 4;
     quantizationTable_UV_dc = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F, quan_UV).clone();
-    //quantizationTable_Y = Mat::ones(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F);
-    //quantizationTable_UV = Mat::ones(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F) ;
-    quantizationTable_Y = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, quan_Y).clone() * 2;
+    quantizationTable_Y = Mat(MACROBLOCKSIZE, MACROBLOCKSIZE, CV_32F, quan_Y).clone() * 4;
     quantizationTable_UV = Mat(MACROBLOCKSIZE / 2, MACROBLOCKSIZE / 2, CV_32F, quan_UV).clone();    
 }
 
@@ -330,18 +328,19 @@ Mat WebP::predictiveCoding(int block_num, int channel) {
 }
 
 Mat WebP::hPredict(int block_num, int block_size, Mat channel_mat) {
-    Mat residual_mat, predict_mat, origin_mat;
+    Mat residual_mat, predict_mat, origin_mat, left_col_mat, col_mat;
     int block_row = block_num / block_cols;
     int block_col = block_num % block_cols;
     predict_mat = Mat::zeros(block_size, block_size, CV_16S);
     origin_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
     if (block_col != 0) {
-        Mat temp = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size + block_size - 1));
-        temp.copyTo(predict_mat);
+        left_col_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size));
     } else {
-        Mat temp0 = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size - 1));
-        Mat temp1 = predict_mat(Range(0, block_size), Range(1, block_size));
-        temp0.copyTo(temp1);
+        left_col_mat = Mat::zeros(block_size, 1, CV_16S);
+    }
+    for (int i = 0; i < block_size; i ++) {
+        col_mat = predict_mat(Range(0, block_size), Range(i, i + 1));
+        left_col_mat.copyTo(col_mat);
     }
     subtract(origin_mat, predict_mat, residual_mat);
     return residual_mat;
@@ -349,18 +348,19 @@ Mat WebP::hPredict(int block_num, int block_size, Mat channel_mat) {
 
 
 Mat WebP::vPredict(int block_num, int block_size, Mat channel_mat) {
-    Mat residual_mat, predict_mat, origin_mat;
+    Mat residual_mat, predict_mat, origin_mat, up_row_mat, row_mat;
     int block_row = block_num / block_cols;
     int block_col = block_num % block_cols;
     predict_mat = Mat::zeros(block_size, block_size, CV_16S);
     origin_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size, block_col * block_size + block_size)).clone();
     if (block_row != 0) {
-        Mat temp = channel_mat(Range(block_row * block_size - 1, block_row * block_size + block_size - 1), Range(block_col * block_size, block_col * block_size + block_size));
-        temp.copyTo(predict_mat);
+        up_row_mat = channel_mat(Range(block_row * block_size - 1, block_row * block_size), Range(block_col * block_size, block_col * block_size + block_size));
     } else {
-        Mat temp0 = channel_mat(Range(block_row * block_size, block_row * block_size + block_size - 1), Range(block_col * block_size, block_col * block_size + block_size));
-        Mat temp1 = predict_mat(Range(1, block_size), Range(0, block_size));
-        temp0.copyTo(temp1);
+        up_row_mat = Mat::zeros(1, block_size, CV_16S);
+    }
+    for (int i = 0; i < block_size; i ++) {
+        row_mat = predict_mat(Range(i, i + 1), Range(0, block_size));
+        up_row_mat.copyTo(row_mat);
     }
     subtract(origin_mat, predict_mat, residual_mat);
     return residual_mat;
@@ -606,52 +606,37 @@ void WebP::decompress() {
 Mat WebP::inhPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
     int block_row = block_num / block_cols;
     int block_col = block_num % block_cols;
-    Mat previous_col, residual_col, origin_col, origin_mat;
+    Mat predict_mat, origin_mat, left_col_mat, col_mat;
     residual_mat.convertTo(residual_mat, CV_16S);
-    origin_mat = Mat::zeros(block_size, block_size, CV_16S);
+    predict_mat = Mat::zeros(block_size, block_size, CV_16S);
     if (block_col != 0) {
-        previous_col = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size)).clone();
-        for (int i = 0; i < block_size; i++) {
-            residual_col = residual_mat(Range(0, block_size), Range(i, i + 1));
-            origin_col = residual_col + previous_col;
-            origin_col.copyTo(origin_mat(Range(0, block_size), Range(i, i + 1)));
-            previous_col = origin_col.clone();
-        }
+        left_col_mat = channel_mat(Range(block_row * block_size, block_row * block_size + block_size), Range(block_col * block_size - 1, block_col * block_size)).clone();
     } else {
-        previous_col = Mat::zeros(block_size, 1, CV_16S);
-        for (int i = 0; i < block_size; i++) {
-            residual_col = residual_mat(Range(0, block_size), Range(i, i + 1));
-            origin_col = residual_col + previous_col;
-            origin_col.copyTo(origin_mat(Range(0, block_size), Range(i, i + 1)));
-            previous_col = origin_col.clone();
-        }
+        left_col_mat = Mat::zeros(block_size, 1, CV_16S);
     }
+    for (int i = 0; i < block_size; i++) {
+        col_mat = predict_mat(Range(0, block_size), Range(i, i + 1));
+        left_col_mat.copyTo(col_mat);
+    }
+    origin_mat = predict_mat + residual_mat;
     return origin_mat;
 }
 Mat WebP::invPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
     int block_row = block_num / block_cols;
     int block_col = block_num % block_cols;
-    Mat previous_row, residual_row, origin_row, origin_mat;
+    Mat predict_mat, origin_mat, up_row_mat, row_mat;
     residual_mat.convertTo(residual_mat, CV_16S);
-    origin_mat = Mat::zeros(block_size, block_size, CV_16S);
+    predict_mat = Mat::zeros(block_size, block_size, CV_16S);
     if (block_row != 0) {
-        previous_row = channel_mat(Range(block_row * block_size - 1, block_row * block_size), Range(block_col * block_size, block_col * block_size + block_size));
-        for (int i = 0; i < block_size; i++) {
-            residual_row = residual_mat(Range(i, i + 1), Range(0, block_size));
-            origin_row = residual_row + previous_row;
-            origin_row.copyTo(origin_mat(Range(i, i + 1), Range(0, block_size)));
-            previous_row = origin_row.clone();
-        }
+        up_row_mat = channel_mat(Range(block_row * block_size - 1, block_row * block_size), Range(block_col * block_size, block_col * block_size + block_size));
     } else {
-        previous_row = Mat::zeros(1, block_size, CV_16S);
-        for (int i = 0; i < block_size; i++) {
-            residual_row = residual_mat(Range(i, i + 1), Range(0, block_size));
-            origin_row = residual_row + previous_row;
-            origin_row.copyTo(origin_mat(Range(i, i + 1), Range(0, block_size)));
-            previous_row = origin_row.clone();
-        }
+        up_row_mat = Mat::zeros(1, block_size, CV_16S);
     }
-    //cout<<origin_mat<<endl;
+    for (int i = 0; i < block_size; i ++) {
+        row_mat = predict_mat(Range(i, i + 1), Range(0, block_size));
+        up_row_mat.copyTo(row_mat);
+    }
+    origin_mat = predict_mat + residual_mat;
     return origin_mat;
 }
 Mat WebP::indcPredict(int block_num, int block_size, Mat channel_mat, Mat residual_mat) {
@@ -939,6 +924,7 @@ void WebP::writeRunLengthCode() {
     int block_num = block_cols * block_rows;
     short num_s;
     unsigned char num_uc;
+    char num_c;
 
     lenBeforeArith_Y = vec_DAR_Y.size();
     lenBeforeArith_U = vec_DAR_U.size();
@@ -990,8 +976,8 @@ void WebP::writeRunLengthCode() {
             }
         }
     }
-cout<<count<<endl;
-    
+    //cout<<count<<endl;
+    //return; 
 }
 
 
